@@ -33,6 +33,9 @@ button{font:inherit;padding:8px 18px;border-radius:8px;border:0;background:#4caf
 [hidden]{display:none!important}
 .card{width:min(94vw,520px);box-sizing:border-box;background:var(--card);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
 input{padding:8px;border-radius:8px;border:1px solid #8886;font:inherit;background:var(--bg);color:var(--fg)}
+button:disabled{opacity:.4;cursor:default}
+select{padding:8px;border-radius:8px;border:1px solid #8886;font:inherit;background:var(--bg);color:var(--fg)}
+#pick{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:9;box-shadow:0 8px 30px #0006}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -44,9 +47,11 @@ input{padding:8px;border-radius:8px;border:1px solid #8886;font:inherit;backgrou
 <div class="card"><b>닉네임</b><input id="nick" maxlength="12" placeholder="닉네임 (이 기기에 저장돼요)">
 <button onclick="startLocal()">로컬 2인 대전</button><small id="fbmsg"></small></div>
 <div class="card" id="online" hidden><b>방 만들기</b><input id="rname" maxlength="20" placeholder="방 이름"><input id="rid" maxlength="20" placeholder="방 ID (영문·숫자·한글, 비우면 자동)">
+<select id="side"><option value="w">⚪ 내가 백팀</option><option value="b">⚫ 내가 흑팀</option></select>
 <button onclick="create()">방 만들기</button>
 <b>방 ID로 입장</b><div class="row"><input id="jid" maxlength="20" placeholder="방 ID" style="flex:1"><button onclick="join($('jid').value)">입장</button></div>
 <b>열린 방 (대기·진행 중)</b><div id="rooms"></div></div>
+<div class="card" id="pick" hidden></div>
 <div class="card" id="lbc" hidden><b>🏆 리더보드 TOP 10</b><div id="lb"></div>
 <small>🥉 0 · 🥈 100 · 🥇 300 · 🔷 600 · 💎 1000점 / 승 +30 · 패 -10 · 무 +5</small></div>
 </div>
@@ -138,7 +143,7 @@ function moves(r,c){
   return out;
 }
 function click(r,c){
-  if(over||(mode=="on"&&turn!=me))return;
+  if(over||(mode=="on"&&(turn!=me||!paired)))return;
   const p=B[r][c];
   if(sel){
     const m=sel.m.find(m=>m.r==r&&m.c==c);
@@ -227,6 +232,7 @@ function act(fr,fc,m){
 function end(c,why){over=true;winner=c;sel=null;msg("🎉 "+names[c]+" 승리! "+why);draw();push();record()}
 function msg(t){lastMsg=t;document.getElementById("msg").textContent=t}
 function draw(){
+  if(!B)return;
   let h="";
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const p=B[r][c],it=I[r][c],m=sel&&sel.m.find(m=>m.r==r&&m.c==c);
@@ -259,7 +265,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
 const TIERS=[[1000,"💎 다이아"],[600,"🔷 플래티넘"],[300,"🥇 골드"],[100,"🥈 실버"],[0,"🥉 브론즈"]];
 const tier=v=>TIERS.find(t=>v>=t[0])[1];
-let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={};
+let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null;
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
 function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;show(1);init()}
@@ -278,7 +284,8 @@ function attach(){const r=fdb.ref("rooms/"+rid+"/state");r.on("value",s=>{const 
 const cleanId=v=>v.replace(/[^A-Za-z0-9가-힣_-]/g,"").slice(0,20);
 function renderWho(){
   const P=Object.values(pres),on=r=>P.some(p=>p.role==r),sp=P.filter(p=>p.role=="s").map(p=>esc(p.nick));
-  $("who").innerHTML=`<b>방 ID: ${esc(rid)}</b><div>⚪ ${on("w")?"🟢":"🔴"} ${esc(names.w)} · ⚫ ${on("b")?"🟢":"🔴"} ${esc(names.b)}</div><div>👀 관전자 ${sp.length}명${sp.length?": "+sp.join(", "):""}</div>`;
+  const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}`:(me=="s"&&!over?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
+  $("who").innerHTML=`<b>방 ID: ${esc(rid)}</b> <small>(${me=="s"?"👀 관전 중":me=="w"?"⚪ 백팀":"⚫ 흑팀"})</small><div class="row"><span>⚪ ${seat("w")}</span><span>⚫ ${seat("b")}</span></div><div>👀 관전자 ${sp.length}명${sp.length?": "+sp.join(", "):""}</div>`;
 }
 function presence(n){
   pres={};pr=fdb.ref("rooms/"+rid+"/presence/"+uid);
@@ -287,44 +294,79 @@ function presence(n){
   all.on("value",s=>{pres=s.val()||{};renderWho()});
   offs.push(()=>all.off());
 }
+function seatsUpdate(v){
+  seats=v||{};names={w:seats.w||"빈자리",b:seats.b||"빈자리"};
+  const was=paired;paired=!!(seats.w&&seats.b);
+  if(paired&&!was){
+    if(seatRef)seatRef.onDisconnect().cancel();
+    if(!over){if(me!="s")fdb.ref("rooms/"+rid+"/status").set("playing");msg("두 팀 모두 입장! "+(turn=="w"?"백":"흑")+" 차례")}
+  }
+  if(!paired&&!over)msg("상대 팀을 기다리는 중…");
+  draw();renderWho();
+}
+function enter(id,role,n,fresh){
+  mode="on";me=role;rid=id;lastPushed="";paired=false;seats={};B=null;
+  show(1);$("newb").hidden=true;
+  if(fresh){init();push()}
+  attach();presence(n);
+  if(role!="s"){seatRef=fdb.ref("rooms/"+id+"/seats/"+role);seatRef.onDisconnect().remove()}
+  const sr=fdb.ref("rooms/"+id+"/seats");sr.on("value",x=>seatsUpdate(x.val()));offs.push(()=>sr.off());
+}
 function create(){
   const n=nick();if(!n)return;
-  const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase();
-  const ref=fdb.ref("rooms/"+id),g=ref.child("guest");
-  const room={name:$("rname").value.trim().slice(0,20)||n+"의 방",host:n,status:"waiting"};
-  ref.transaction(v=>v?undefined:room,(e,ok)=>{
+  const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value;
+  const room={name:$("rname").value.trim().slice(0,20)||n+"의 방",host:n,status:"waiting",seats:{[side]:n}};
+  fdb.ref("rooms/"+id).transaction(v=>v?undefined:room,(e,ok)=>{
     if(!ok){alert("이미 있는 방 ID예요. 다른 ID를 써 주세요");return}
-    mode="on";me="w";paired=false;lastPushed="";rid=id;names={w:n,b:"대기 중…"};
-    ref.onDisconnect().remove();
-    show(1);$("newb").hidden=true;init();push();attach();presence(n);
-    g.on("value",x=>{if(x.val()&&!paired){paired=true;names.b=x.val();ref.onDisconnect().cancel();ref.child("status").set("playing");msg("상대 입장! 백 차례");draw();renderWho()}});
-    offs.push(()=>g.off());
+    enter(id,side,n,true);
   });
 }
 function join(id){
   const n=nick();if(!n)return;
   id=cleanId(id||"");if(!id)return;
-  const ref=fdb.ref("rooms/"+id);
-  ref.once("value").then(snap=>{
+  fdb.ref("rooms/"+id).once("value").then(snap=>{
     const r=snap.val();if(!r){alert("그런 방 ID가 없어요");return}
-    const enter=role=>{mode="on";me=role;paired=true;rid=id;lastPushed="";names={w:r.host,b:role=="b"?n:(r.guest||"?")};show(1);$("newb").hidden=true;attach();presence(n);
-      const g=ref.child("guest");g.on("value",x=>{if(x.val()){names.b=x.val();draw();renderWho()}});offs.push(()=>g.off())};
-    if(r.guest||r.status!="waiting"){enter("s");return}
-    ref.child("guest").transaction(v=>v?undefined:n,(e,ok)=>enter(ok?"b":"s"));
+    const st=r.seats||{},open=k=>!st[k]&&r.status=="waiting";
+    const b=(k,l)=>`<button ${open(k)?"":"disabled"} onclick="pickSeat('${id}','${k}')">${l}${st[k]?" ("+esc(st[k])+")":""}</button>`;
+    $("pick").innerHTML=`<b>${esc(r.name)} · 팀 선택</b><div class="row">${b("w","⚪ 백팀")}${b("b","⚫ 흑팀")}<button onclick="pickSeat('${id}','s')">👀 관전</button></div><button onclick="$('pick').hidden=true" style="background:#888">취소</button>`;
+    $("pick").hidden=false;
+  });
+}
+function pickSeat(id,k){
+  $("pick").hidden=true;const n=localStorage.getItem("nick");
+  if(k=="s"){enter(id,"s",n);return}
+  fdb.ref("rooms/"+id+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
+    if(!ok){alert("방금 다른 사람이 앉았어요. 다시 골라 주세요");join(id);return}
+    enter(id,k,n);
+  });
+}
+function sit(k){
+  const n=localStorage.getItem("nick");
+  fdb.ref("rooms/"+rid+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
+    if(!ok){alert("방금 다른 사람이 앉았어요");return}
+    me=k;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);
+    if(!paired)seatRef.onDisconnect().remove();
+    if(pr)pr.update({role:k});
+    renderWho();draw();
   });
 }
 function leave(){
   if(mode=="on"){
     if(!over&&paired&&me!="s"){over=true;winner=me=="w"?"b":"w";msg(names[me]+" 기권");push();record()}
+    const was=paired,mine=me,id=rid,other=seats[me=="w"?"b":"w"];
     offs.forEach(f=>f());offs=[];
     if(pr){pr.remove();pr=null}
-    if(me=="w"&&!paired)fdb.ref("rooms/"+rid).remove();
+    if(seatRef){
+      if(!was&&mine!="s"){seatRef.remove();if(!other)fdb.ref("rooms/"+id).remove()}
+      else seatRef.onDisconnect().cancel();
+      seatRef=null;
+    }
   }
-  mode="local";show(0);
+  $("pick").hidden=true;mode="local";show(0);
 }
 function watchLobby(){
   fdb.ref("rooms").orderByChild("status").startAt("playing").limitToLast(30).on("value",s=>{
-    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";h+=`<div class="row"><span>${esc(r.name)} · ${esc(r.host)} <small>ID ${esc(c.key)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"참가":"관전"}</button></div>`});
+    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats)return;h+=`<div class="row"><span>${esc(r.name)} · ${esc(r.host)} <small>ID ${esc(c.key)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
     $("rooms").innerHTML=h||"<small>열린 방이 없어요</small>";
   });
   fdb.ref("players").orderByChild("score").limitToLast(10).on("value",s=>{
