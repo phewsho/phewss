@@ -25,6 +25,7 @@ h1{font-size:20px;margin:4px 0}
 .b{color:#1a1a1a;text-shadow:0 0 1px #fff8}
 .hp{position:absolute;right:2px;bottom:1px;font-size:min(3vw,12px);font-weight:700;background:#000b;color:#fff;border-radius:6px;padding:0 4px;text-shadow:none;line-height:1.3}
 .it{font-size:min(5vw,24px);opacity:.9;display:flex;flex-direction:column;align-items:center;line-height:1}
+.wn{font-size:12px;font-weight:600;opacity:.8}
 .it small{font-size:min(2.8vw,12px);font-weight:700}
 #msg{min-height:22px;font-weight:600;text-align:center}
 button{font:inherit;padding:8px 18px;border-radius:8px;border:0;background:#4caf50;color:#fff;cursor:pointer}
@@ -61,12 +62,6 @@ summary{cursor:pointer;font-size:14px}
 <b>방 ID로 입장</b><div class="row"><input id="jid" maxlength="20" placeholder="방 ID" style="flex:1"><button onclick="join($('jid').value)">입장</button></div>
 <b>열린 방 (대기·진행 중)</b><div id="rooms"></div></div>
 <div class="card" id="pick" hidden></div>
-<div class="card" id="lbc" hidden>
-<b>🏆 리더보드</b>
-<div id="mine"></div>
-<div id="lb"></div>
-<details><summary>티어 기준 · 점수 규칙</summary><div id="tiers"></div><small>승리 +30 · 패배 -10 · 무승부 +5 (점수는 0 아래로 내려가지 않아요)</small></details>
-</div>
 </div>
 <div id="game" hidden>
 <h1>♟ 아이템 체스</h1>
@@ -261,7 +256,7 @@ function draw(){
   for(const k of["w","b"]){
     const e=document.getElementById("p"+k);
     e.className="p"+(turn==k&&!over?" on":"");
-    e.innerHTML=`${k=="w"?"⚪":"⚫"} ${esc(names[k])} <b>${S[k]}</b> / ${WIN}<div class="track"><i style="width:${S[k]/WIN*100}%"></i></div>`;
+    e.innerHTML=`${k=="w"?"⚪":"⚫"} ${esc(names[k])}${wtag(k)} <b>${S[k]}</b> / ${WIN}<div class="track"><i style="width:${S[k]/WIN*100}%"></i></div>`;
   }
 }
 window.click_=click;
@@ -280,7 +275,12 @@ const TIERS=[[1500,"👑 마스터","#9c27b0"],[1000,"💎 다이아","#29b6f6"]
 const tierOf=v=>TIERS.find(t=>(v||0)>=t[0]);
 const tier=v=>tierOf(v)[1];
 const badge=v=>{const t=tierOf(v);return `<span class="tbadge" style="background:${t[2]}">${t[1]}</span>`};
-let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null;
+let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null,seatU={},winsOf={},winRefs={};
+function wtag(k){const u=seatU[k];return mode=="on"&&seats[k]&&u&&winsOf[u]!=null?` <span class="wn">🏆${winsOf[u]}승</span>`:""}
+function watchWins(){
+  ["w","b"].forEach(k=>{const u=seatU[k];if(!u||winRefs[u])return;winRefs[u]=1;
+    const r=fdb.ref("players/"+u+"/win");r.on("value",x=>{winsOf[u]=x.val()||0;draw();renderWho()});offs.push(()=>r.off())});
+}
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
 function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;show(1);init()}
@@ -299,7 +299,7 @@ function attach(){const r=fdb.ref("rooms/"+rid+"/state");r.on("value",s=>{const 
 const cleanId=v=>v.replace(/[^A-Za-z0-9가-힣_-]/g,"").slice(0,20);
 function renderWho(){
   const P=Object.values(pres),on=r=>P.some(p=>p.role==r),sp=P.filter(p=>p.role=="s").map(p=>esc(p.nick));
-  const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}`:(me=="s"&&!over?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
+  const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}${wtag(k)}`:(me=="s"&&!over?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
   $("who").innerHTML=`<b>방 ID: ${esc(rid)}</b> <small>(${me=="s"?"👀 관전 중":me=="w"?"⚪ 백팀":"⚫ 흑팀"})</small><div class="row"><span>⚪ ${seat("w")}</span><span>⚫ ${seat("b")}</span></div><div>👀 관전자 ${sp.length}명${sp.length?": "+sp.join(", "):""}</div>`;
 }
 function presence(n){
@@ -320,17 +320,18 @@ function seatsUpdate(v){
   draw();renderWho();
 }
 function enter(id,role,n,fresh){
-  mode="on";me=role;rid=id;lastPushed="";paired=false;seats={};B=null;
+  mode="on";me=role;rid=id;lastPushed="";paired=false;seats={};B=null;seatU={};winsOf={};winRefs={};
   show(1);$("newb").hidden=true;
   if(fresh){init();push()}
   attach();presence(n);
   if(role!="s"){seatRef=fdb.ref("rooms/"+id+"/seats/"+role);seatRef.onDisconnect().remove()}
   const sr=fdb.ref("rooms/"+id+"/seats");sr.on("value",x=>seatsUpdate(x.val()));offs.push(()=>sr.off());
+  const ur=fdb.ref("rooms/"+id+"/su");ur.on("value",x=>{seatU=x.val()||{};watchWins();draw();renderWho()});offs.push(()=>ur.off());
 }
 function create(){
   const n=nick();if(!n)return;
   const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value;
-  const room={name:$("rname").value.trim().slice(0,20)||n+"의 방",host:n,status:"waiting",seats:{[side]:n}};
+  const room={name:$("rname").value.trim().slice(0,20)||n+"의 방",host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid}};
   fdb.ref("rooms/"+id).transaction(v=>v?undefined:room,(e,ok)=>{
     if(!ok){alert("이미 있는 방 ID예요. 다른 ID를 써 주세요");return}
     enter(id,side,n,true);
@@ -352,14 +353,14 @@ function pickSeat(id,k){
   if(k=="s"){enter(id,"s",n);return}
   fdb.ref("rooms/"+id+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
     if(!ok){alert("방금 다른 사람이 앉았어요. 다시 골라 주세요");join(id);return}
-    enter(id,k,n);
+    fdb.ref("rooms/"+id+"/su/"+k).set(uid);enter(id,k,n);
   });
 }
 function sit(k){
   const n=localStorage.getItem("nick");
   fdb.ref("rooms/"+rid+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
     if(!ok){alert("방금 다른 사람이 앉았어요");return}
-    me=k;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);
+    me=k;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);fdb.ref("rooms/"+rid+"/su/"+k).set(uid);
     if(!paired)seatRef.onDisconnect().remove();
     if(pr)pr.update({role:k});
     renderWho();draw();
@@ -384,24 +385,11 @@ function watchLobby(){
     let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats)return;h+=`<div class="row"><span>${esc(r.name)} · ${esc(r.host)} <small>ID ${esc(c.key)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
     $("rooms").innerHTML=h||"<small>열린 방이 없어요</small>";
   });
-  $("tiers").innerHTML=TIERS.slice().reverse().map(t=>`<div class="row"><span class="tbadge" style="background:${t[2]}">${t[1]}</span><span>${t[0]}점 이상</span></div>`).join("");
-  fdb.ref("players").orderByChild("score").limitToLast(50).on("value",s=>{
-    const a=[];s.forEach(c=>{a.push({id:c.key,...c.val()})});a.reverse();
-    const medal=i=>["🥇","🥈","🥉"][i]||(i+1);
-    $("lb").innerHTML=a.map((p,i)=>{const g=(p.win||0)+(p.lose||0);return `<div class="lbrow${p.id==uid?" me":""}"><span class="rk">${medal(i)}</span><span>${esc(p.nick)}${p.id==uid?" (나)":""}<br>${badge(p.score)}</span><span class="sc"><b>${p.score||0}점</b><br><small>${p.win||0}승 ${p.lose||0}패${g?" · 승률 "+Math.round((p.win||0)/g*100)+"%":""}</small></span></div>`}).join("")||"<small>아직 기록이 없어요. 첫 판을 이겨서 1등이 돼 보세요!</small>";
-  });
-  fdb.ref("players/"+uid).on("value",x=>{
-    const p=x.val()||{},v=p.score||0,t=tierOf(v),i=TIERS.indexOf(t),nx=TIERS[i-1];
-    const pct=nx?Math.round((v-t[0])/(nx[0]-t[0])*100):100;
-    $("mine").innerHTML=`<div class="row"><span><b>${esc(localStorage.getItem("nick")||"나")}</b> ${badge(v)}</span><b>${v}점</b></div>
-<div class="track"><i style="width:${pct}%;background:${t[2]}"></i></div>
-<small>${nx?`다음 티어 ${nx[1]}까지 ${nx[0]-v}점`:"최고 티어예요!"} · ${p.win||0}승 ${p.lose||0}패</small>`;
-  });
 }
 function fbInit(){
   if(FB.apiKey.startsWith("YOUR")||FB.databaseURL.startsWith("YOUR")){$("fbmsg").textContent="⚠️ 파일 안의 FB 설정에 apiKey와 databaseURL을 넣으면 온라인 대전이 켜져요. 지금은 로컬 대전만 가능해요.";return}
   firebase.initializeApp(FB);fdb=firebase.database();
-  firebase.auth().signInAnonymously().then(c=>{uid=c.user.uid;$("online").hidden=false;$("lbc").hidden=false;watchLobby()}).catch(e=>{$("fbmsg").textContent="Firebase 연결 실패: "+e.message});
+  firebase.auth().signInAnonymously().then(c=>{uid=c.user.uid;$("online").hidden=false;watchLobby()}).catch(e=>{$("fbmsg").textContent="Firebase 연결 실패: "+e.message});
 }
 $("nick").value=localStorage.getItem("nick")||"";
 if(typeof firebase=="undefined")$("fbmsg").textContent="Firebase 스크립트를 불러오지 못해 로컬 대전만 가능해요.";else fbInit();
