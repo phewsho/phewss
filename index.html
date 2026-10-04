@@ -47,6 +47,12 @@ select{padding:8px;border-radius:8px;border:1px solid #8886;font:inherit;backgro
 #lb{max-height:420px;overflow-y:auto}
 summary{cursor:pointer;font-size:14px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.pc.tn{filter:drop-shadow(0 0 1.5px #4caf50) drop-shadow(0 0 1.5px #4caf50)}
+.boom{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;z-index:3}
+.boom .bg{position:absolute;animation:die .75s ease-out forwards}
+.boom .bx{position:absolute;font-size:min(9vw,46px);animation:bx .6s ease-out forwards}
+@keyframes die{0%{transform:scale(1);opacity:1}40%{transform:scale(1.25) rotate(-10deg);opacity:.9}100%{transform:scale(1.7) rotate(25deg);opacity:0;filter:blur(3px)}}
+@keyframes bx{0%{transform:scale(.2);opacity:0}30%{opacity:1}100%{transform:scale(1.5);opacity:0}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -79,7 +85,8 @@ summary{cursor:pointer;font-size:14px}
 • ⚔️ 공격력 +1 · 🛡️ 무적(상대 한 턴) · ⏩ 한 번 더 · 🧑 용병(말 하나 공짜)<br>
 • 💫 경직: 주변 8칸 적 말이 다음 턴에 움직이지 못함<br>
 • 🔀 모양 변화: 먹은 말이 랜덤한 기물(퀸·룩·비숍·나이트·폰)로 변신, 체력은 유지 (왕은 제외)<br>
-• 🧹 같은 가로줄의 적 전멸 · ❌ X자 대각선의 적 전멸<br>
+• 🧹 같은 가로줄의 적 전멸 · ↕️ 같은 세로줄의 적 전멸<br>
+• ➕ 십자(가로+세로)의 적 전멸 · ❌ X자 대각선의 적 전멸<br>
 • 💣 지뢰: 주변 8칸의 <b>적</b> 말만 피해 3 (보임)<br>
 • 숨겨진 지뢰: 밟으면 주변 8칸의 <b>모든</b> 말 피해 3 (안 보임, 조심!)<br>
 • 공격 후 상대가 살아남으면 공격자는 제자리, 죽이면 그 칸으로 이동<br>
@@ -89,6 +96,8 @@ summary{cursor:pointer;font-size:14px}
 <script>
 const G={k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"},MAXHP=5,WIN=15;
 let B,I,turn,S,sel,over;
+let fx=[],fxSeq=0,fxShown=0;
+function die(y,x){const q=B[y][x];if(q)fx.push([y,x,G[q.t],q.c])}
 const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const ins=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
 
@@ -105,7 +114,7 @@ function init(){
   msg("백 차례");draw();
 }
 function spawn(){
-  const W={h:30,s:34,t:5,a:7,v:6,e:6,z:4,x:4,g:6,m:6,n:6,f:6,c:6};
+  const W={h:30,s:34,t:5,a:7,v:6,e:6,z:4,x:4,g:6,m:6,n:6,f:6,c:6,y:3,l:4};
   let x=R(1,Object.values(W).reduce((a,b)=>a+b)),k;
   for(k in W){if((x-=W[k])<=0)break}
   for(let n=0;n<300;n++){
@@ -113,7 +122,7 @@ function spawn(){
     if(!B[r][c]&&!I[r][c]){I[r][c]={k,v:Math.random()<.65?1:2};return}
   }
 }
-function icon(i){return i.k=="h"?`❤️<small>+${i.v}</small>`:i.k=="t"?"❤️<small>전체+1</small>":{s:"⭐",a:"⚔️",v:"🛡️",e:"⏩",z:"🧹",x:"❌",g:"🧑",m:"💣",f:"💫",c:"🔀",n:""}[i.k]}
+function icon(i){return i.k=="h"?`❤️<small>+${i.v}</small>`:i.k=="t"?"❤️<small>전체+1</small>":{s:"⭐",a:"⚔️",v:"🛡️",e:"⏩",z:"🧹",x:"❌",g:"🧑",m:"💣",f:"💫",c:"🔀",y:"➕",l:"↕️",n:""}[i.k]}
 function merc(c,r0,c0){
   let cand=[];
   for(let y=r0-1;y<=r0+1;y++)for(let x=c0-1;x<=c0+1;x++)if(ins(y,x)&&!B[y][x]&&!I[y][x])cand.push([y,x]);
@@ -162,13 +171,13 @@ function click(r,c){
   draw();
 }
 function act(fr,fc,m){
-  const p=B[fr][fc];let move=true,note="",extra=false;
+  const p=B[fr][fc];let move=true,note="",extra=false;fx=[];fxSeq++;
   if(m.atk){
     const t=B[m.r][m.c];
     if(t.inv){move=false;note="🛡️ 무적이라 피해 없음 · "}
     else{
       t.hp-=p.atk||3;
-      if(t.hp<=0){
+      if(t.hp<=0){die(m.r,m.c);
         if(t.t=="k"){B[m.r][m.c]=null;B[fr][fc]=null;B[m.r][m.c]=p;end(p.c,"왕을 처치했습니다!");return}
       }else{move=false;note="⚔️ 상대 말 체력 "+t.hp+" · "}
     }
@@ -181,12 +190,12 @@ function act(fr,fc,m){
       I[m.r][m.c]=null;spawn();
       const k=it.k,me=p.c,foe=me=="w"?"b":"w";
       const add=n=>{p.hp=Math.min(MAXHP,p.hp+n)};
-      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv)B[y][x]=null};
+      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv){die(y,x);B[y][x]=null}};
       const blast=(all)=>{
         for(let y=m.r-1;y<=m.r+1;y++)for(let x=m.c-1;x<=m.c+1;x++){
           if(!ins(y,x)||(y==m.r&&x==m.c))continue;
           const q=B[y][x];
-          if(q&&!q.inv&&(all||q.c==foe)){q.hp-=3;if(q.hp<=0)B[y][x]=null}
+          if(q&&!q.inv&&(all||q.c==foe)){q.hp-=3;if(q.hp<=0){die(y,x);B[y][x]=null}}
         }
       };
       if(k=="h"){add(it.v);note="❤️ 체력 +"+it.v+" · "}
@@ -211,6 +220,8 @@ function act(fr,fc,m){
       }
       else if(k=="e"){extra=true;note="⏩ 한 번 더! · "}
       else if(k=="z"){for(let x=0;x<8;x++)kill(m.r,x);note="🧹 가로줄 청소! · "}
+      else if(k=="l"){for(let y=0;y<8;y++)kill(y,m.c);note="↕️ 세로줄 공격! · "}
+      else if(k=="y"){for(let i=0;i<8;i++){kill(m.r,i);kill(i,m.c)}note="➕ 십자 공격! · "}
       else if(k=="x"){for(let d=1;d<8;d++){kill(m.r+d,m.c+d);kill(m.r-d,m.c-d);kill(m.r+d,m.c-d);kill(m.r-d,m.c+d)}note="❌ X자 공격! · "}
       else if(k=="g"){merc(me,m.r,m.c);note="🪖 용병 합류! · "}
       else if(k=="m"){blast(false);note="💣 지뢰! 주변 적 말 피해 3 · "}
@@ -248,11 +259,15 @@ function draw(){
     if(sel&&sel.r==r&&sel.c==c)cl+=" sel";
     if(m)cl+=m.atk?" at":" mv";
     h+=`<div class="${cl}" onclick="click_(${r},${c})">`;
-    if(p)h+=`<span class="${p.c}">${G[p.t]}</span><span class="hp">${p.inv?"🛡":""}${p.stun?"💫":""}${p.atk>3?"⚔"+p.atk+" ":""}♥${p.hp}</span>`;
+    if(p)h+=`<span class="pc ${p.c}${p.c==turn&&!over?" tn":""}">${G[p.t]}</span><span class="hp">${p.inv?"🛡":""}${p.stun?"💫":""}${p.atk>3?"⚔"+p.atk+" ":""}♥${p.hp}</span>`;
     else if(it)h+=`<span class="it">${icon(it)}</span>`;
     h+="</div>";
   }
   document.getElementById("board").innerHTML=h;
+  if(fx.length&&fxShown!==fxSeq){
+    fxShown=fxSeq;const cells=document.getElementById("board").children;
+    fx.forEach(([y,x,g,c])=>cells[y*8+x].insertAdjacentHTML("beforeend",`<span class="boom"><span class="bg ${c}">${g}</span><span class="bx">💥</span></span>`));
+  }
   for(const k of["w","b"]){
     const e=document.getElementById("p"+k);
     e.className="p"+(turn==k&&!over?" on":"");
@@ -284,8 +299,8 @@ function watchWins(){
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
 function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;show(1);init()}
-function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
-function load(t){const o=JSON.parse(t);B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;sel=null;msg(o.m);draw();if(over)record()}
+function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,fq:fxSeq});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
+function load(t){const o=JSON.parse(t);B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
 function record(){
   if(mode!="on"||!winner||me=="s")return;
   const w=winner,m=me,d=w=="d"?5:w==m?30:-10;
