@@ -160,11 +160,11 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 <h1>♟ 아이템 체스</h1>
 <div class="card"><b>닉네임</b><input id="nick" maxlength="12" placeholder="닉네임 (이 기기에 저장돼요)">
 <small id="fbmsg"></small></div>
-<div class="card" id="online" hidden><b>방 만들기</b><input id="rname" maxlength="20" placeholder="방 이름"><input id="rid" maxlength="20" placeholder="방 ID (영문·숫자·한글, 비우면 자동)">
+<div class="card" id="online" hidden><b>방 만들기</b><input id="rid" maxlength="20" placeholder="방 ID (영문·숫자, 비우면 자동)" autocapitalize="off" autocomplete="off" oninput="this.value=cleanId(this.value)"><input id="rpw" type="password" maxlength="20" placeholder="비밀번호 (선택, 비우면 공개방)" autocomplete="new-password">
 <select id="side"><option value="w">⚪ 내가 백팀</option><option value="b">⚫ 내가 흑팀</option></select>
 <button onclick="create()">방 만들기</button>
 <button id="rejoin" hidden onclick="join(localStorage.getItem('lastRoom'))" style="background:linear-gradient(135deg,#ffe08a,#ffb3c7);color:#5b3a2a"></button>
-<b>방 ID로 입장</b><div class="row"><input id="jid" maxlength="20" placeholder="방 ID" style="flex:1"><button onclick="join($('jid').value)">입장</button></div>
+<b>방 ID로 입장</b><div class="row"><input id="jid" maxlength="20" placeholder="방 ID" style="flex:1" autocapitalize="off" autocomplete="off" oninput="this.value=cleanId(this.value)"><button onclick="join($('jid').value)">입장</button></div>
 <b>열린 방 (대기·진행 중)</b><div id="rooms"></div></div>
 <div class="card" id="pick" hidden></div>
 </div>
@@ -457,7 +457,10 @@ function record(){
   });
 }
 function attach(){const r=fdb.ref("rooms/"+rid+"/state");r.on("value",s=>{const v=s.val();if(v&&v!==lastPushed)load(v)});offs.push(()=>r.off())}
-const cleanId=v=>v.replace(/[^A-Za-z0-9가-힣_-]/g,"").slice(0,20);
+const cleanId=v=>v.replace(/[^A-Za-z0-9]/g,"").slice(0,20);
+async function hpw(id,p){const t="ic:"+id+":"+p;
+  try{const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+  catch(e){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return "d"+(h>>>0).toString(16)}}
 function renderWho(){
   const P=Object.values(pres),on=r=>P.some(p=>p.role==r),sp=P.filter(p=>p.role=="s").map(p=>esc(p.nick));
   const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}${wtag(k)}`:(me=="s"&&!over?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
@@ -494,10 +497,11 @@ function enter(id,role,n,fresh){
   const sr=fdb.ref("rooms/"+id+"/seats");sr.on("value",x=>seatsUpdate(x.val()));offs.push(()=>sr.off());
   const ur=fdb.ref("rooms/"+id+"/su");ur.on("value",x=>{seatU=x.val()||{};watchWins();draw();renderWho()});offs.push(()=>ur.off());
 }
-function create(){
+async function create(){
   const n=nick();if(!n)return;
-  const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value;
-  const room={name:$("rname").value.trim().slice(0,20)||n+"의 방",host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid}};
+  const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value,pw=$("rpw").value;
+  const room={host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid}};
+  if(pw)room.pw=await hpw(id,pw);
   fdb.ref("rooms/"+id).transaction(v=>v?undefined:room,(e,ok)=>{
     if(!ok){alert("이미 있는 방 ID예요. 다른 ID를 써 주세요");return}
     enter(id,side,n,true);
@@ -513,6 +517,10 @@ function join(id){
       if(st[mineK]){enter(id,mineK,n);return}
       fdb.ref("rooms/"+id+"/seats/"+mineK).transaction(v=>v?undefined:n,(e,ok)=>{if(ok)enter(id,mineK,n);else join2(id,r,n)});return;
     }
+    if(r.pw){
+      const p=prompt("🔒 비밀번호를 입력하세요");if(p===null)return;
+      hpw(id,p).then(h=>{if(h!==r.pw){alert("비밀번호가 틀렸어요");return}join2(id,r,n)});return;
+    }
     join2(id,r,n);
   });
 }
@@ -520,7 +528,7 @@ function join2(id,r,n){
   {
     const st=r.seats||{},open=k=>!st[k]&&r.status=="waiting";
     const b=(k,l)=>`<button ${open(k)?"":"disabled"} onclick="pickSeat('${id}','${k}')">${l}${st[k]?" ("+esc(st[k])+")":""}</button>`;
-    $("pick").innerHTML=`<b>${esc(r.name)} · 팀 선택</b><div class="row">${b("w","⚪ 백팀")}${b("b","⚫ 흑팀")}<button onclick="pickSeat('${id}','s')">👀 관전</button></div><button onclick="$('pick').hidden=true" style="background:var(--lav);color:#4a3f66">취소</button>`;
+    $("pick").innerHTML=`<b>방 ${esc(id)} · 팀 선택</b><div class="row">${b("w","⚪ 백팀")}${b("b","⚫ 흑팀")}<button onclick="pickSeat('${id}','s')">👀 관전</button></div><button onclick="$('pick').hidden=true" style="background:var(--lav);color:#4a3f66">취소</button>`;
     $("pick").hidden=false;
   }
 }
@@ -574,7 +582,7 @@ function leave(){
 }
 function watchLobby(){
   fdb.ref("rooms").orderByChild("status").startAt("playing").limitToLast(30).on("value",s=>{
-    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats)return;h+=`<div class="row"><span>${esc(r.name)} · ${esc(r.host)} <small>ID ${esc(c.key)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
+    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats)return;h+=`<div class="row"><span>${r.pw?"🔒 ":""}<b>${esc(c.key)}</b> <small>· ${esc(r.host)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
     $("rooms").innerHTML=h||"<small>열린 방이 없어요</small>";
   });
 }
