@@ -152,6 +152,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}}
 :root[data-theme="dark"] .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}
+.pc,.boom .bg{font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Noto Sans Symbols","DejaVu Sans","Apple Symbols",serif;font-variant-emoji:text;-webkit-text-fill-color:currentColor}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -199,7 +200,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 </div></div>
 </div>
 <script>
-const G={k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"},MAXHP=5,WIN=15;
+const G={k:"♚\uFE0E",q:"♛\uFE0E",r:"♜\uFE0E",b:"♝\uFE0E",n:"♞\uFE0E",p:"♟\uFE0E"},MAXHP=5,WIN=15;
 let B,I,turn,S,sel,over;
 let fx=[],fxSeq=0,fxShown=0,snd=[],sndShown=0,hl=[],sp=[],ar=[],ef=[];
 const EFH={stun:'<span class="ef stun"><i>💫</i></span>',sword:'<span class="ef sword"><i></i><b>🗡️</b></span>',shield:'<span class="ef shield"><i></i></span>',merc:'<span class="ef merc"><i></i><b>✨</b></span>',extra:'<span class="ef extra"><i></i><b>⏩</b></span>'};
@@ -229,7 +230,9 @@ function sfx(n){if(muted)return;try{
   else if(n=="win")[523,659,784,1047].forEach((f,i)=>tone(f,.25,"triangle",.15,null,i*.12));
 }catch(e){}}
 function toggleMute(b){muted=!muted;try{localStorage.setItem("mute",muted?"1":"0")}catch(e){}b.textContent=muted?"🔇":"🔊"}
-function die(y,x){const q=B[y][x];if(q)snd.push("die"),fx.push([y,x,G[q.t],q.c])}
+let dealt=0,kd={w:0,b:0},mover="w";
+function summ(){const foe=mover=="w"?"b":"w";if(!dealt&&!kd.w&&!kd.b)return "";let t="💥 피해 "+dealt;if(kd[foe])t+=" · 💀 "+kd[foe]+"기 처치";if(kd[mover])t+=" · 😵 우리 편 "+kd[mover]+"기 손실";return t+" · "}
+function die(y,x){const q=B[y][x];if(q)kd[q.c]++,snd.push("die"),fx.push([y,x,G[q.t],q.c])}
 const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const ins=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
 
@@ -314,12 +317,12 @@ function click(r,c){
   draw();
 }
 function act(fr,fc,m){
-  const p=B[fr][fc];let move=true,note="",extra=false;fx=[];snd=[];hl=[];sp=[];ar=[];ef=[];fxSeq++;
+  const p=B[fr][fc];let move=true,note="",extra=false;fx=[];snd=[];hl=[];sp=[];ar=[];ef=[];fxSeq++;dealt=0;kd={w:0,b:0};mover=p.c;
   if(m.atk){
     const t=B[m.r][m.c];
     if(t.inv){move=false;snd.push("block");note="🛡️ 무적이라 피해 없음 · "}
     else{
-      t.hp-=p.atk||3;
+      dealt+=Math.min(p.atk||3,t.hp);t.hp-=p.atk||3;
       if(t.hp<=0){die(m.r,m.c);
         if(t.t=="k"){B[m.r][m.c]=null;B[fr][fc]=null;B[m.r][m.c]=p;end(p.c,"왕을 처치했습니다!");return}
       }else{move=false;snd.push("hit");ef.push([m.r,m.c,"hurt",p.atk||3]);note="⚔️ 상대 말 체력 "+t.hp+" · "}
@@ -336,12 +339,12 @@ function act(fr,fc,m){
       snd.push(["m","n","z","x","y","l"].includes(k)?"boom":"item");
       const add=n=>{const b=p.hp;p.hp=Math.min(mxh(p),p.hp+n);heal(m.r,m.c,p.hp-b)};
       const zone=(y,x,kd,d)=>{if(ins(y,x))ar.push([y,x,kd,d])};
-      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv){q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}};
+      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv){dealt+=Math.min(2,q.hp);q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}};
       const blast=(all)=>{
         for(let y=m.r-1;y<=m.r+1;y++)for(let x=m.c-1;x<=m.c+1;x++){
           if(!ins(y,x)||(y==m.r&&x==m.c))continue;zone(y,x,"bm",1);
           const q=B[y][x];
-          if(q&&!q.inv&&(all||q.c==foe)){q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}
+          if(q&&!q.inv&&(all||q.c==foe)){dealt+=Math.min(2,q.hp);q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}
         }
       };
       if(k=="h"){add(it.v);note="❤️ 체력 +"+it.v+" · "}
@@ -356,7 +359,7 @@ function act(fr,fc,m){
       }
       else if(k=="s"){S[me]+=it.v||1;sp.push([m.r,m.c,it.v||1]);snd.push("coin");note="⭐ +"+(it.v||1)+"점 · ";if(S[me]>=WIN){note=pre+note}if(S[me]>=WIN){end(me,"점수 "+WIN+"점 달성!");return}}
       else if(k=="t"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.c==me){const b=q.hp;q.hp=Math.min(mxh(q),q.hp+1);heal(y,x,q.hp-b)}}note="💖 아군 전체 체력 +1! · "}
-      else if(k=="o"){let n=0;for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&!q.inv){q.hp-=1;n++;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",1])}}snd.push("curse");note="💔 모든 말 체력 -1! (우리 편 포함) · "}
+      else if(k=="o"){let n=0;for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&!q.inv){dealt+=Math.min(1,q.hp);q.hp-=1;n++;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",1])}}snd.push("curse");note="💔 모든 말 체력 -1! (우리 편 포함) · "}
       else if(k=="a"){p.atk=(p.atk||3)+1;ef.push([m.r,m.c,"sword"]);snd.push("sword");note="🗡️ 공격력 "+p.atk+"! · "}
       else if(k=="v"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.t=="k"&&q.c==me){q.inv=1;ef.push([y,x,"shield"])}}snd.push("shield");note="🛡️ 우리 왕이 상대 한 턴 동안 무적! · "}
       else if(k=="c"){
@@ -395,10 +398,10 @@ function act(fr,fc,m){
   }
   if(!snd.length)snd.push("move");
   sel=null;
-  msg(note+(turn=="w"?"백":"흑")+" 차례");
+  msg(summ()+note+(turn=="w"?"백":"흑")+" 차례");
   draw();push();
 }
-function end(c,why){snd.push("win");over=true;winner=c;sel=null;msg("🎉 "+names[c]+" 승리! "+why);draw();push();record()}
+function end(c,why){why=why+(summ()?" ("+summ().replace(/ · $/,"")+")":"");snd.push("win");over=true;winner=c;sel=null;msg("🎉 "+names[c]+" 승리! "+why);draw();push();record()}
 function msg(t){lastMsg=t;document.getElementById("msg").textContent=t}
 function draw(){
   if(!B)return;
