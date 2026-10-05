@@ -180,6 +180,15 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 #aisel{padding:8px 10px;border-radius:12px;font:inherit;font-weight:600;background:var(--card);color:var(--fg);border:1px solid var(--line)}
 #aib{padding:5px 11px;font-size:12px;border-radius:14px;background:linear-gradient(135deg,#ffe08a,#ffb3c7);color:#5b3a2a;border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
 .topbtns{display:flex;gap:6px;justify-content:flex-end;align-items:center;width:min(94vw,520px);min-height:40px;padding-right:50px;box-sizing:border-box}
+.beam{position:absolute;height:6px;margin-top:-3px;transform-origin:0 50%;pointer-events:none;z-index:6;border-radius:3px;opacity:0;animation:beam .55s ease-out forwards}
+.beam.sw{background:linear-gradient(90deg,#fff,#bfe6ff 25%,#7fc8f0 70%,#7fc8f000);box-shadow:0 0 10px #8fd0ff,0 0 3px #fff}
+.beam.xd{background:linear-gradient(90deg,#fff,#ffc2d6 25%,#ff86b0 70%,#ff86b000);box-shadow:0 0 10px #ff9ec4,0 0 3px #fff}
+.beam.shot{height:4px;margin-top:-2px;background:linear-gradient(90deg,#fff0,#ffe9a0 40%,#ffd54f 85%,#fff);box-shadow:0 0 8px #ffd54f;animation-duration:.4s}
+@keyframes beam{0%{opacity:1;clip-path:inset(0 100% 0 0)}45%{opacity:1;clip-path:inset(0 0 0 0)}100%{opacity:0;clip-path:inset(0 0 0 0)}}
+.area.sw::after,.area.xd::after{content:"";position:absolute;left:-15%;top:50%;width:130%;height:3px;margin-top:-1.5px;background:#fff;box-shadow:0 0 6px #fff,0 0 10px #ffffffaa;transform:rotate(-38deg) scaleX(0);animation:cut .32s ease-out forwards;animation-delay:inherit}
+.area.xd::after{transform:rotate(38deg) scaleX(0);animation-name:cut2}
+@keyframes cut{0%{transform:rotate(-38deg) scaleX(0);opacity:1}55%{transform:rotate(-38deg) scaleX(1);opacity:1}100%{transform:rotate(-38deg) scaleX(1);opacity:0}}
+@keyframes cut2{0%{transform:rotate(38deg) scaleX(0);opacity:1}55%{transform:rotate(38deg) scaleX(1);opacity:1}100%{transform:rotate(38deg) scaleX(1);opacity:0}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -240,6 +249,8 @@ let B,I,turn,S,sel,over;
 const TURN_MS=180000;let tEnd=0,paused=false,tLeft=0,started=true;
 const now=()=>Date.now()+(window.__off||0);
 const fmtT=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+":"+String(ms%60).padStart(2,"0")};
+let bm=[];
+function edgeOf(r,c,a,b){while(ins(r+a,c+b)){r+=a;c+=b}return [r,c]}
 let fx=[],fxSeq=0,fxShown=0,snd=[],sndShown=0,hl=[],sp=[],ar=[],ef=[];
 const EFH={stun:'<span class="ef stun"><i>💫</i></span>',sword:'<span class="ef sword"><i></i><b>🗡️</b></span>',shield:'<span class="ef shield"><i></i></span>',merc:'<span class="ef merc"><i></i><b>✨</b></span>',extra:'<span class="ef extra"><i></i><b>⏩</b></span>'};
 function heal(y,x,n){if(n>0){hl.push([y,x,n]);snd.push("heal")}}
@@ -268,6 +279,8 @@ function sfx(n){if(muted)return;try{
   else if(n=="timeout"){tone(880,.15,"square",.07);tone(660,.15,"square",.07,null,.17);tone(440,.35,"square",.07,null,.34)}
   else if(n=="pause"){tone(660,.12,"sine",.09);tone(520,.18,"sine",.09,null,.1)}
   else if(n=="resume"){tone(520,.12,"sine",.09);tone(780,.18,"sine",.09,null,.1)}
+  else if(n=="zap"){[0,70,140,230].forEach((d,i)=>setTimeout(()=>{try{noise(.08,.24,2200+i*700);tone(2400-i*300,.06,"sawtooth",.035,900)}catch(e){}},d))}
+  else if(n=="shot"){tone(1700,.16,"sawtooth",.05,260);noise(.1,.14,3200)}
   else if(n=="win")[523,659,784,1047].forEach((f,i)=>tone(f,.25,"triangle",.15,null,i*.12));
 }catch(e){}}
 function toggleMute(b){muted=!muted;try{localStorage.setItem("mute",muted?"1":"0")}catch(e){}b.textContent=muted?"🔇":"🔊"}
@@ -360,15 +373,15 @@ function click(r,c){
   draw();
 }
 function act(fr,fc,m){
-  const p=B[fr][fc];let move=true,note="",extra=false;fx=[];snd=[];hl=[];sp=[];ar=[];ef=[];fxSeq++;dealt=0;kd={w:0,b:0};mover=p.c;
+  const p=B[fr][fc];let move=true,note="",extra=false;fx=[];snd=[];hl=[];sp=[];ar=[];ef=[];bm=[];fxSeq++;dealt=0;kd={w:0,b:0};mover=p.c;
   if(m.atk){
     const t=B[m.r][m.c];
-    if(t.inv){move=false;snd.push("block");note="🛡️ 무적이라 피해 없음 · "}
+    if(t.inv){move=false;snd.push("block");if(Math.max(Math.abs(m.r-fr),Math.abs(m.c-fc))>1){bm.push([fr,fc,m.r,m.c,"shot"]);snd.push("shot")}note="🛡️ 무적이라 피해 없음 · "}
     else{
       dealt+=Math.min(p.atk||3,t.hp);t.hp-=p.atk||3;
       if(t.hp<=0){die(m.r,m.c);
         if(t.t=="k"){B[m.r][m.c]=null;B[fr][fc]=null;B[m.r][m.c]=p;end(p.c,"왕을 처치했습니다!");return}
-      }else{move=false;snd.push("hit");ef.push([m.r,m.c,"hurt",p.atk||3]);note="⚔️ 상대 말 체력 "+t.hp+" · "}
+      }else{move=false;snd.push("hit");if(Math.max(Math.abs(m.r-fr),Math.abs(m.c-fc))>1){bm.push([fr,fc,m.r,m.c,"shot"]);snd.push("shot")}ef.push([m.r,m.c,"hurt",p.atk||3]);note="⚔️ 상대 말 체력 "+t.hp+" · "}
     }
   }
   if(move){
@@ -413,10 +426,10 @@ function act(fr,fc,m){
         }
       }
       else if(k=="e"){extra=true;ef.push([m.r,m.c,"extra"]);snd.push("extra");note="⏩ 한 번 더! · "}
-      else if(k=="z"){for(let x=0;x<8;x++){zone(m.r,x,"sw",Math.abs(x-m.c));kill(m.r,x)}note="🧹↔ 가로줄 청소! · "}
-      else if(k=="l"){for(let y=0;y<8;y++){zone(y,m.c,"sw",Math.abs(y-m.r));kill(y,m.c)}note="🧹↕ 세로줄 청소! · "}
-      else if(k=="y"){for(let i=0;i<8;i++){zone(m.r,i,"sw",Math.abs(i-m.c));zone(i,m.c,"sw",Math.abs(i-m.r));kill(m.r,i);kill(i,m.c)}note="➕ 십자 공격! · "}
-      else if(k=="x"){for(let d=1;d<8;d++){[[1,1],[-1,-1],[1,-1],[-1,1]].forEach(([a,b])=>zone(m.r+a*d,m.c+b*d,"xd",d));kill(m.r+d,m.c+d);kill(m.r-d,m.c-d);kill(m.r+d,m.c-d);kill(m.r-d,m.c+d)}note="❌ X자 공격! · "}
+      else if(k=="z"){for(let x=0;x<8;x++){zone(m.r,x,"sw",Math.abs(x-m.c));kill(m.r,x)}[[0,-1],[0,1]].forEach(([a,b])=>bm.push([m.r,m.c,...edgeOf(m.r,m.c,a,b),"sw"]));snd.push("zap");note="🧹↔ 가로줄 청소! · "}
+      else if(k=="l"){for(let y=0;y<8;y++){zone(y,m.c,"sw",Math.abs(y-m.r));kill(y,m.c)}[[-1,0],[1,0]].forEach(([a,b])=>bm.push([m.r,m.c,...edgeOf(m.r,m.c,a,b),"sw"]));snd.push("zap");note="🧹↕ 세로줄 청소! · "}
+      else if(k=="y"){for(let i=0;i<8;i++){zone(m.r,i,"sw",Math.abs(i-m.c));zone(i,m.c,"sw",Math.abs(i-m.r));kill(m.r,i);kill(i,m.c)}[[0,-1],[0,1],[-1,0],[1,0]].forEach(([a,b])=>bm.push([m.r,m.c,...edgeOf(m.r,m.c,a,b),"sw"]));snd.push("zap");note="➕ 십자 공격! · "}
+      else if(k=="x"){for(let d=1;d<8;d++){[[1,1],[-1,-1],[1,-1],[-1,1]].forEach(([a,b])=>zone(m.r+a*d,m.c+b*d,"xd",d));kill(m.r+d,m.c+d);kill(m.r-d,m.c-d);kill(m.r+d,m.c-d);kill(m.r-d,m.c+d)}[[1,1],[-1,-1],[1,-1],[-1,1]].forEach(([a,b])=>bm.push([m.r,m.c,...edgeOf(m.r,m.c,a,b),"xd"]));snd.push("zap");note="❌ X자 공격! · "}
       else if(k=="g"){merc(me,m.r,m.c);snd.push("merc");note="👤 용병 합류! · "}
       else if(k=="m"){blast(false);note="💣 지뢰! 주변 적 말 피해 2 · "}
       else if(k=="n"){blast(true);note="💥 숨겨진 지뢰 폭발! 주변 모든 말 피해 2 · "}
@@ -461,7 +474,7 @@ function draw(){
     h+="</div>";
   }
   document.getElementById("board").innerHTML=h;
-  if(sndShown!==fxSeq){sndShown=fxSeq;[...new Set(snd)].forEach(sfx);const cs=document.getElementById("board").children;hl.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="heal"><i>✨</i><b>+${n}</b></span>`));sp.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="scp"><b>+${n}⭐</b></span>`));ar.forEach(([y,x,kd,d])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="area ${kd}" style="animation-delay:${d*45}ms"></span>`));ef.forEach(([y,x,t,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",t=="hurt"?`<span class="ef hurt"><b>-${n}</b></span>`:EFH[t]))}
+  if(sndShown!==fxSeq){sndShown=fxSeq;[...new Set(snd)].forEach(sfx);const cs=document.getElementById("board").children;hl.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="heal"><i>✨</i><b>+${n}</b></span>`));sp.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="scp"><b>+${n}⭐</b></span>`));ar.forEach(([y,x,kd,d])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="area ${kd}" style="animation-delay:${d*45}ms"></span>`));ef.forEach(([y,x,t,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",t=="hurt"?`<span class="ef hurt"><b>-${n}</b></span>`:EFH[t]));const bd=document.getElementById("board");bm.forEach(([r1,c1,r2,c2,k],i)=>{const x1=(c1+.5)*12.5,y1=(r1+.5)*12.5,dx=(c2-c1)*12.5,dy=(r2-r1)*12.5,len=Math.hypot(dx,dy)+6.25,ang=Math.atan2(dy,dx)*180/Math.PI;bd.insertAdjacentHTML("beforeend",`<span class="beam ${k}" style="left:${x1}%;top:${y1}%;width:${len}%;transform:rotate(${ang}deg);animation-delay:${k=="shot"?0:i*35}ms"></span>`)})}
   if(fx.length&&fxShown!==fxSeq){
     fxShown=fxSeq;const cells=document.getElementById("board").children;
     fx.forEach(([y,x,g,c])=>cells[y*8+x].insertAdjacentHTML("beforeend",`<span class="boom"><span class="bg ${c}">${PS(g)}</span><span class="bx">💥</span></span>`));
@@ -497,8 +510,8 @@ function watchWins(){
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g;const lr=localStorage.getItem("lastRoom");$("rejoin").hidden=!lr||!uid;if(lr)$("rejoin").textContent="🔁 마지막 방 다시 들어가기 ("+lr+")"}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
 function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;$("resignb").hidden=true;show(1);init()}
-function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,snd,hl,sp,ar,ef,bags,fq:fxSeq,tEnd,paused,tLeft,started});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
-function load(t){const o=JSON.parse(t);tEnd=o.tEnd||now()+TURN_MS;paused=!!o.paused;tLeft=o.tLeft||0;started=o.started!==false;B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];snd=o.snd||[];hl=o.hl||[];sp=o.sp||[];ar=o.ar||[];ef=o.ef||[];if(o.bags)bags=o.bags;fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
+function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,snd,hl,sp,ar,ef,bm,bags,fq:fxSeq,tEnd,paused,tLeft,started});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
+function load(t){const o=JSON.parse(t);tEnd=o.tEnd||now()+TURN_MS;paused=!!o.paused;tLeft=o.tLeft||0;started=o.started!==false;B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];snd=o.snd||[];hl=o.hl||[];sp=o.sp||[];ar=o.ar||[];ef=o.ef||[];bm=o.bm||[];if(o.bags)bags=o.bags;fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
 function record(){
   if(mode!="on"||!winner||me=="s")return;
   const w=winner,m=me,d=w=="d"?5:w==m?30:-10;
@@ -691,10 +704,10 @@ function togglePause(){
   if(over||!started||!canAct())return;
   if(paused){paused=false;tEnd=now()+tLeft;snd=["resume"];msg("▶ 다시 시작! "+(turn=="w"?"백":"흑")+" 차례")}
   else{tLeft=Math.max(0,tEnd-now());paused=true;snd=["pause"];msg("⏸ 일시정지")}
-  fx=[];hl=[];sp=[];ar=[];ef=[];fxSeq++;sel=null;draw();if(typeof push=="function")push();
+  fx=[];hl=[];sp=[];ar=[];ef=[];bm=[];fxSeq++;sel=null;draw();if(typeof push=="function")push();
 }
 function timeoutTurn(){
-  fx=[];hl=[];sp=[];ar=[];ef=[];snd=["timeout"];fxSeq++;dealt=0;kd={w:0,b:0};
+  fx=[];hl=[];sp=[];ar=[];ef=[];bm=[];snd=["timeout"];fxSeq++;dealt=0;kd={w:0,b:0};
   B.flat().forEach(x=>{if(x&&x.c==turn&&x.stun)x.stun--});
   const was=turn;turn=turn=="w"?"b":"w";
   B.flat().forEach(x=>{if(x&&x.c==turn&&x.inv)x.inv--});
