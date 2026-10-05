@@ -153,6 +153,17 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}}
 :root[data-theme="dark"] .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}
 .pc,.boom .bg{font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Noto Sans Symbols","DejaVu Sans","Apple Symbols",serif;font-variant-emoji:text;-webkit-text-fill-color:currentColor}
+.pc,.boom .bg{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.pc svg,.boom .bg svg{width:80%;height:80%;overflow:visible;fill:var(--pf);stroke:var(--ps);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.pc svg .ln,.boom .bg svg .ln{fill:none;stroke-width:1.8}
+.pc svg .ey,.boom .bg svg .ey{fill:var(--ps);stroke:none}
+.w{--pf:#fffaf0;--ps:#4a3d5c}
+.b{--pf:#5b4870;--ps:#2a2140}
+.pc.w{filter:drop-shadow(0 1px 1.5px #3f335266)}
+.pc.b{filter:drop-shadow(0 0 1px #ffffffcc) drop-shadow(0 1px 1.5px #2a214055)}
+.pc.tn{filter:drop-shadow(0 0 1.8px #ffd54f) drop-shadow(0 0 1.8px #ffd54f) drop-shadow(0 0 3px #ffe9a0)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .w{--pf:#e6dfd2;--ps:#1a1330}:root:not([data-theme="light"]) .b{--pf:#2a2140;--ps:#cdb8ff}:root:not([data-theme="light"]) .pc.b{filter:drop-shadow(0 0 2px #cdb8ff88)}:root:not([data-theme="light"]) .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}}
+:root[data-theme="dark"] .w{--pf:#e6dfd2;--ps:#1a1330}:root[data-theme="dark"] .b{--pf:#2a2140;--ps:#cdb8ff}:root[data-theme="dark"] .pc.b{filter:drop-shadow(0 0 2px #cdb8ff88)}:root[data-theme="dark"] .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -200,6 +211,9 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 </div></div>
 </div>
 <script>
+const SV={"p": "<path d=\"M18.5 22h8l-.8 2.5c2.6 2.6 4.3 6.5 4.8 11.5h-16c.5-5 2.2-8.9 4.8-11.5z\"/><circle cx=\"22.5\" cy=\"15.5\" r=\"5.2\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "r": "<path d=\"M14.5 36l1.3-13h13.4l1.3 13z\"/><path d=\"M12 23v-9h4.2v3.2h3.8V14h5v3.2h3.8V14H33v9z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "b": "<path d=\"M15.5 36c1-4.2 2.8-7.2 4.2-9h5.6c1.4 1.8 3.2 4.8 4.2 9z\"/><path d=\"M22.5 9c-5.2 4-7.4 9-6.4 13 .8 3 3.2 5 6.4 5s5.6-2 6.4-5c1-4-1.2-9-6.4-13z\"/><circle cx=\"22.5\" cy=\"7\" r=\"2.2\"/><path class=\"ln\" d=\"M25 14l-4.5 5.5\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "n": "<path d=\"M13.5 36c.3-5.5 2.6-9.6 6.4-12.4l-6 1.2c-2.1.3-3.4-1.7-2.4-3.6l5.6-7.6c1-1.6 2.6-2.8 4.2-3.6l.8-3.2 2.2 2.9c6.4 1.2 10.2 7.4 9.6 16.3L33.4 36z\"/><circle class=\"ey\" cx=\"19.5\" cy=\"15.5\" r=\"1.3\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "q": "<path d=\"M14 31L11 15l3.6 6.5L17 11l3 9 2.5-11 2.5 11 3-9 2.4 10.5L34 15l-3 16z\"/><circle cx=\"11\" cy=\"14\" r=\"1.9\"/><circle cx=\"17\" cy=\"10.2\" r=\"1.9\"/><circle cx=\"22.5\" cy=\"8\" r=\"1.9\"/><circle cx=\"28\" cy=\"10.2\" r=\"1.9\"/><circle cx=\"34\" cy=\"14\" r=\"1.9\"/><path d=\"M14 31h17l1.2 5H12.8z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "k": "<path d=\"M14 31c-3.4-4.4-4.2-9.5-1.2-12.4 3.2-3 7.5-.9 9.7 3.4 2.2-4.3 6.5-6.4 9.7-3.4 3 2.9 2.2 8-1.2 12.4z\"/><path class=\"ln\" d=\"M22.5 5v12M18.5 9h8\"/><path d=\"M14 31h17l1.2 5H12.8z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>"};
+const PS=t=>SV[t]?`<svg viewBox="0 0 45 45">${SV[t]}</svg>`:t;
+const NM={k:"킹",q:"퀸",r:"룩",b:"비숍",n:"나이트",p:"폰"};
 const G={k:"♚\uFE0E",q:"♛\uFE0E",r:"♜\uFE0E",b:"♝\uFE0E",n:"♞\uFE0E",p:"♟\uFE0E"},MAXHP=5,WIN=15;
 let B,I,turn,S,sel,over;
 let fx=[],fxSeq=0,fxShown=0,snd=[],sndShown=0,hl=[],sp=[],ar=[],ef=[];
@@ -232,7 +246,7 @@ function sfx(n){if(muted)return;try{
 function toggleMute(b){muted=!muted;try{localStorage.setItem("mute",muted?"1":"0")}catch(e){}b.textContent=muted?"🔇":"🔊"}
 let dealt=0,kd={w:0,b:0},mover="w";
 function summ(){const foe=mover=="w"?"b":"w";if(!dealt&&!kd.w&&!kd.b)return "";let t="💥 피해 "+dealt;if(kd[foe])t+=" · 💀 "+kd[foe]+"기 처치";if(kd[mover])t+=" · 😵 우리 편 "+kd[mover]+"기 손실";return t+" · "}
-function die(y,x){const q=B[y][x];if(q)kd[q.c]++,snd.push("die"),fx.push([y,x,G[q.t],q.c])}
+function die(y,x){const q=B[y][x];if(q)kd[q.c]++,snd.push("die"),fx.push([y,x,q.t,q.c])}
 const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const ins=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
 
@@ -366,7 +380,7 @@ function act(fr,fc,m){
         if(p.t=="k")note="🔀 왕은 모양이 바뀌지 않아요 · ";
         else{
           const o="qrrbbbnnnppp".split("").filter(t=>t!=p.t&&!(t=="p"&&(m.r==0||m.r==7)));
-          p.t=o[R(0,o.length-1)];note="🔀 "+G[p.t]+" 으로 변신! · ";
+          p.t=o[R(0,o.length-1)];note="🔀 "+NM[p.t]+"(으)로 변신! · ";
         }
       }
       else if(k=="e"){extra=true;ef.push([m.r,m.c,"extra"]);snd.push("extra");note="⏩ 한 번 더! · "}
@@ -412,7 +426,7 @@ function draw(){
     if(sel&&sel.r==r&&sel.c==c)cl+=" sel";
     if(m)cl+=m.atk?" at":" mv";
     h+=`<div class="${cl}" onclick="click_(${r},${c})">`;
-    if(p)h+=`<span class="pc ${p.c}${p.c==turn&&!over?" tn":""}">${G[p.t]}</span>${p.inv?'<span class="shd"></span>':""}${hpbar(p.hp,mxh(p),p.t=="k")}${p.inv||p.stun||p.atk>3?`<span class="hp">${p.inv?"🛡":""}${p.stun?"💫":""}${p.atk>3?"🗡"+p.atk:""}</span>`:""}`;
+    if(p)h+=`<span class="pc ${p.c}${p.c==turn&&!over?" tn":""}">${PS(p.t)}</span>${p.inv?'<span class="shd"></span>':""}${hpbar(p.hp,mxh(p),p.t=="k")}${p.inv||p.stun||p.atk>3?`<span class="hp">${p.inv?"🛡":""}${p.stun?"💫":""}${p.atk>3?"🗡"+p.atk:""}</span>`:""}`;
     else if(it)h+=`<span class="it">${icon(it)}</span>`;
     h+="</div>";
   }
@@ -420,7 +434,7 @@ function draw(){
   if(sndShown!==fxSeq){sndShown=fxSeq;[...new Set(snd)].forEach(sfx);const cs=document.getElementById("board").children;hl.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="heal"><i>✨</i><b>+${n}</b></span>`));sp.forEach(([y,x,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="scp"><b>+${n}⭐</b></span>`));ar.forEach(([y,x,kd,d])=>cs[y*8+x].insertAdjacentHTML("beforeend",`<span class="area ${kd}" style="animation-delay:${d*45}ms"></span>`));ef.forEach(([y,x,t,n])=>cs[y*8+x].insertAdjacentHTML("beforeend",t=="hurt"?`<span class="ef hurt"><b>-${n}</b></span>`:EFH[t]))}
   if(fx.length&&fxShown!==fxSeq){
     fxShown=fxSeq;const cells=document.getElementById("board").children;
-    fx.forEach(([y,x,g,c])=>cells[y*8+x].insertAdjacentHTML("beforeend",`<span class="boom"><span class="bg ${c}">${g}</span><span class="bx">💥</span></span>`));
+    fx.forEach(([y,x,g,c])=>cells[y*8+x].insertAdjacentHTML("beforeend",`<span class="boom"><span class="bg ${c}">${PS(g)}</span><span class="bx">💥</span></span>`));
   }
   for(const k of["w","b"]){
     const e=document.getElementById("p"+k);
