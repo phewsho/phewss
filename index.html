@@ -164,6 +164,10 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 .pc.tn{filter:drop-shadow(0 0 1.8px #ffd54f) drop-shadow(0 0 1.8px #ffd54f) drop-shadow(0 0 3px #ffe9a0)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .w{--pf:#e6dfd2;--ps:#1a1330}:root:not([data-theme="light"]) .b{--pf:#2a2140;--ps:#cdb8ff}:root:not([data-theme="light"]) .pc.b{filter:drop-shadow(0 0 2px #cdb8ff88)}:root:not([data-theme="light"]) .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}}
 :root[data-theme="dark"] .w{--pf:#e6dfd2;--ps:#1a1330}:root[data-theme="dark"] .b{--pf:#2a2140;--ps:#cdb8ff}:root[data-theme="dark"] .pc.b{filter:drop-shadow(0 0 2px #cdb8ff88)}:root[data-theme="dark"] .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}
+#pick{background:#fffdfb!important;opacity:1;border:2px solid var(--lav);box-shadow:0 0 0 100vmax #2a214066,0 12px 40px #2a214066!important;top:50%!important;transform:translate(-50%,-50%)!important;padding:16px 18px;gap:12px}
+#pick b{font-size:16px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #pick{background:#2c2642!important;border-color:#5d5180;box-shadow:0 0 0 100vmax #0009,0 12px 40px #000a!important}}
+:root[data-theme="dark"] #pick{background:#2c2642!important;border-color:#5d5180;box-shadow:0 0 0 100vmax #0009,0 12px 40px #000a!important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -189,7 +193,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 <div class="card" id="who"></div>
 <div id="board"></div>
 <div id="msg"></div>
-<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
+<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="specb" hidden onclick="toSpectate()" style="background:var(--lav);color:#4a3f66">👀 관전으로</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
 <div class="rules closed" id="rules">
 <div class="rhead" onclick="toggleRules()"><b>📖 규칙</b><span id="rarr">▼</span></div>
 <div id="rbody">
@@ -206,6 +210,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 • 숨겨진 지뢰: 밟으면 주변 8칸의 <b>모든</b> 말 피해 2 (안 보임, 조심!)<br>
 • 공격 후 상대가 살아남으면 공격자는 제자리, 죽이면 그 칸으로 이동<br>
 • 온라인: 🔄 새 게임은 게임이 끝났으면 바로, 진행 중이면 상대가 수락해야 시작돼요<br>
+• 온라인: 게임 시작 전엔 👀 관전으로 바꿀 수 있지만, 한 번 고른 팀은 바꿀 수 없어요<br>
 • 온라인: 나가도 같은 기기·브라우저로 다시 들어오면 원래 팀으로 이어서 해요 (기권은 🏳️ 버튼)<br>
 • 상대 왕을 죽이거나 점수 15점을 먼저 모으면 승리 (체크 없음)
 </div></div>
@@ -458,7 +463,7 @@ const TIERS=[[1500,"👑 마스터","#9c27b0"],[1000,"💎 다이아","#29b6f6"]
 const tierOf=v=>TIERS.find(t=>(v||0)>=t[0]);
 const tier=v=>tierOf(v)[1];
 const badge=v=>{const t=tierOf(v);return `<span class="tbadge" style="background:${t[2]}">${t[1]}</span>`};
-let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null,seatU={},winsOf={},winRefs={};
+let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null,picked={},seatU={},winsOf={},winRefs={};
 function wtag(k){const u=seatU[k];return mode=="on"&&seats[k]&&u&&winsOf[u]!=null?` <span class="wn">🏆${winsOf[u]}승</span>`:""}
 function watchWins(){
   ["w","b"].forEach(k=>{const u=seatU[k];if(!u||winRefs[u])return;winRefs[u]=1;
@@ -485,8 +490,9 @@ async function hpw(id,p){const t="ic:"+id+":"+p;
   catch(e){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return "d"+(h>>>0).toString(16)}}
 function renderWho(){
   const P=Object.values(pres),on=r=>P.some(p=>p.role==r),sp=P.filter(p=>p.role=="s").map(p=>esc(p.nick));
-  const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}${wtag(k)}`:(me=="s"&&!over?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
-  $("who").innerHTML=`<b>방 ID: ${esc(rid)}</b> <small>(${me=="s"?"👀 관전 중":me=="w"?"⚪ 백팀":"⚫ 흑팀"})</small><div class="row"><span>⚪ ${seat("w")}</span><span>⚫ ${seat("b")}</span></div><div>👀 관전자 ${sp.length}명${sp.length?": "+sp.join(", "):""}</div>`;
+  const seat=k=>seats[k]?`${on(k)?"🟢":"🔴"} ${esc(seats[k])}${wtag(k)}`:(me=="s"&&!over&&!picked[uid]?`<button onclick="sit('${k}')">${k=="w"?"백":"흑"}팀으로 앉기</button>`:"빈자리");
+  $("specb").hidden=!(mode=="on"&&me!="s"&&!paired&&!over);
+  $("who").innerHTML=`<b>방 ID: ${esc(rid)}</b> <small>(${me=="s"?"👀 관전 중":me=="w"?"⚪ 백팀":"⚫ 흑팀"})</small><div class="row"><span>⚪ ${seat("w")}</span><span>⚫ ${seat("b")}</span></div><div>👀 관전자 ${sp.length}명${sp.length?": "+sp.join(", "):""}</div>${me=="s"&&picked[uid]&&!paired?"<small>한 번 팀을 고른 뒤에는 다른 팀으로 바꿀 수 없어요</small>":""}`;
 }
 function presence(n){
   pres={};pr=fdb.ref("rooms/"+rid+"/presence/"+uid);
@@ -518,12 +524,13 @@ function enter(id,role,n,fresh){
   attach();presence(n);
   if(role!="s"){seatRef=fdb.ref("rooms/"+id+"/seats/"+role);seatRef.onDisconnect().remove()}
   const sr=fdb.ref("rooms/"+id+"/seats");sr.on("value",x=>seatsUpdate(x.val()));offs.push(()=>sr.off());
+  picked={};const pk=fdb.ref("rooms/"+id+"/picked");pk.on("value",x=>{picked=x.val()||{};renderWho()});offs.push(()=>pk.off());
   const ur=fdb.ref("rooms/"+id+"/su");ur.on("value",x=>{seatU=x.val()||{};watchWins();draw();renderWho()});offs.push(()=>ur.off());
 }
 async function create(){
   const n=nick();if(!n)return;
   const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value,pw=$("rpw").value;
-  const room={host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid},ts:firebase.database.ServerValue.TIMESTAMP};
+  const room={host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid},picked:{[uid]:true},ts:firebase.database.ServerValue.TIMESTAMP};
   if(pw)room.pw=await hpw(id,pw);
   fdb.ref("rooms/"+id).transaction(v=>v?undefined:room,(e,ok)=>{
     if(!ok){alert("이미 있는 방 ID예요. 다른 ID를 써 주세요");return}
@@ -549,7 +556,7 @@ function join(id){
 }
 function join2(id,r,n){
   {
-    const st=r.seats||{},open=k=>!st[k]&&r.status=="waiting";
+    const st=r.seats||{},was=r.picked&&r.picked[uid],open=k=>!was&&!st[k]&&r.status=="waiting";
     const b=(k,l)=>`<button ${open(k)?"":"disabled"} onclick="pickSeat('${id}','${k}')">${l}${st[k]?" ("+esc(st[k])+")":""}</button>`;
     $("pick").innerHTML=`<b>방 ${esc(id)} · 팀 선택</b><div class="row">${b("w","⚪ 백팀")}${b("b","⚫ 흑팀")}<button onclick="pickSeat('${id}','s')">👀 관전</button></div><button onclick="$('pick').hidden=true" style="background:var(--lav);color:#4a3f66">취소</button>`;
     $("pick").hidden=false;
@@ -560,18 +567,29 @@ function pickSeat(id,k){
   if(k=="s"){enter(id,"s",n);return}
   fdb.ref("rooms/"+id+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
     if(!ok){alert("방금 다른 사람이 앉았어요. 다시 골라 주세요");join(id);return}
-    fdb.ref("rooms/"+id+"/su/"+k).set(uid);enter(id,k,n);
+    fdb.ref("rooms/"+id+"/su/"+k).set(uid);fdb.ref("rooms/"+id+"/picked/"+uid).set(true);enter(id,k,n);
   });
 }
 function sit(k){
+  if(picked[uid]){alert("한 번 팀을 고른 뒤에는 다른 팀으로 바꿀 수 없어요");return}
   const n=localStorage.getItem("nick");
   fdb.ref("rooms/"+rid+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
     if(!ok){alert("방금 다른 사람이 앉았어요");return}
-    me=k;$("newb").hidden=false;$("resignb").hidden=false;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);fdb.ref("rooms/"+rid+"/su/"+k).set(uid);
+    me=k;$("newb").hidden=false;$("resignb").hidden=false;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);fdb.ref("rooms/"+rid+"/su/"+k).set(uid);fdb.ref("rooms/"+rid+"/picked/"+uid).set(true);
     if(!paired)seatRef.onDisconnect().remove();
     if(pr)pr.update({role:k});
     renderWho();draw();
   });
+}
+function toSpectate(){
+  if(mode!="on"||me=="s"||paired||over)return;
+  if(!confirm("관전으로 바꿀까요? 한 번 팀을 고른 뒤에는 다시 팀으로 앉을 수 없어요."))return;
+  const k=me;
+  if(seatRef){seatRef.onDisconnect().cancel();seatRef.remove();seatRef=null}
+  fdb.ref("rooms/"+rid+"/su/"+k).remove();
+  me="s";$("newb").hidden=true;$("resignb").hidden=true;
+  if(pr)pr.update({role:"s"});
+  msg("👀 관전으로 바꿨어요");renderWho();draw();
 }
 let reqPending=false;
 function newGame(){
@@ -616,7 +634,7 @@ function watchLobby(){
   setInterval(gcRooms,30000);
   fdb.ref("rooms").limitToLast(60).on("value",s=>{
     lastRooms=s;gcRooms();
-    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats||!pCount(r))return;h+=`<div class="row"><span>${r.pw?"🔒 ":""}<b>${esc(c.key)}</b> <small>· ${esc(r.host)} · 👥${pCount(r)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
+    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!pCount(r))return;h+=`<div class="row"><span>${r.pw?"🔒 ":""}<b>${esc(c.key)}</b> <small>· ${esc(r.host)} · 👥${pCount(r)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
     $("rooms").innerHTML=h||"<small>열린 방이 없어요</small>";
   });
 }
