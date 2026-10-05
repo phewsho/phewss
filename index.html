@@ -167,7 +167,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 <div class="card" id="who"></div>
 <div id="board"></div>
 <div id="msg"></div>
-<div class="row"><button onclick="init()" id="newb">새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
+<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
 <div class="rules">
 <b>규칙</b><br>
 • 모든 말 체력 3 (왕은 6), 공격력 3 (상대 말 칸으로 이동 = 공격)<br>
@@ -182,6 +182,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 • 💣 지뢰: 주변 8칸의 <b>적</b> 말만 피해 3 (보임)<br>
 • 숨겨진 지뢰: 밟으면 주변 8칸의 <b>모든</b> 말 피해 3 (안 보임, 조심!)<br>
 • 공격 후 상대가 살아남으면 공격자는 제자리, 죽이면 그 칸으로 이동<br>
+• 온라인: 🔄 새 게임은 게임이 끝났으면 바로, 진행 중이면 상대가 수락해야 시작돼요<br>
 • 온라인: 나가도 같은 기기·브라우저로 다시 들어오면 원래 팀으로 이어서 해요 (기권은 🏳️ 버튼)<br>
 • 상대 왕을 죽이거나 점수 15점을 먼저 모으면 승리 (체크 없음)
 </div>
@@ -433,7 +434,7 @@ function watchWins(){
 }
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g;const lr=localStorage.getItem("lastRoom");$("rejoin").hidden=!lr||!uid;if(lr)$("rejoin").textContent="🔁 마지막 방 다시 들어가기 ("+lr+")"}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
-function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;show(1);init()}
+function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;$("resignb").hidden=true;show(1);init()}
 function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,snd,hl,sp,ar,ef,bags,fq:fxSeq});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
 function load(t){const o=JSON.parse(t);B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];snd=o.snd||[];hl=o.hl||[];sp=o.sp||[];ar=o.ar||[];ef=o.ef||[];if(o.bags)bags=o.bags;fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
 function record(){
@@ -472,8 +473,12 @@ function seatsUpdate(v){
 function enter(id,role,n,fresh){
   try{localStorage.setItem("lastRoom",id)}catch(e){}
   mode="on";me=role;rid=id;lastPushed="";paired=false;seats={};B=null;seatU={};winsOf={};winRefs={};
-  show(1);$("newb").hidden=true;
+  show(1);$("newb").hidden=role=="s";$("resignb").hidden=role=="s";
   if(fresh){init();push()}
+  const nr=fdb.ref("rooms/"+id+"/newreq");nr.on("value",x=>{const v=x.val();
+    if(!v){if(reqPending){reqPending=false;setTimeout(()=>{if(lastMsg.startsWith("새 게임을 요청"))msg("상대가 새 게임 요청을 거절했어요")},400)}return}
+    if(me=="s"||v.by==me)return;
+    if(confirm(names[v.by]+"님이 새 게임을 원해요. 수락할까요?"))resetRoom();else nr.remove();});offs.push(()=>nr.off());
   attach();presence(n);
   if(role!="s"){seatRef=fdb.ref("rooms/"+id+"/seats/"+role);seatRef.onDisconnect().remove()}
   const sr=fdb.ref("rooms/"+id+"/seats");sr.on("value",x=>seatsUpdate(x.val()));offs.push(()=>sr.off());
@@ -521,11 +526,23 @@ function sit(k){
   const n=localStorage.getItem("nick");
   fdb.ref("rooms/"+rid+"/seats/"+k).transaction(v=>v?undefined:n,(e,ok)=>{
     if(!ok){alert("방금 다른 사람이 앉았어요");return}
-    me=k;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);fdb.ref("rooms/"+rid+"/su/"+k).set(uid);
+    me=k;$("newb").hidden=false;$("resignb").hidden=false;seatRef=fdb.ref("rooms/"+rid+"/seats/"+k);fdb.ref("rooms/"+rid+"/su/"+k).set(uid);
     if(!paired)seatRef.onDisconnect().remove();
     if(pr)pr.update({role:k});
     renderWho();draw();
   });
+}
+let reqPending=false;
+function newGame(){
+  if(mode!="on"){if(!over&&B&&!confirm("진행 중인 게임을 그만두고 새로 시작할까요?"))return;init();return}
+  if(me=="s")return;
+  if(over||!paired){resetRoom();return}
+  reqPending=true;fdb.ref("rooms/"+rid+"/newreq").set({by:me,t:Date.now()});msg("새 게임을 요청했어요. 상대의 수락을 기다리는 중…");
+}
+function resetRoom(){
+  reqPending=false;fdb.ref("rooms/"+rid+"/rec").remove();fdb.ref("rooms/"+rid+"/newreq").remove();
+  init();snd=["merc"];fxSeq++;draw();push();
+  if(paired)fdb.ref("rooms/"+rid+"/status").set("playing");
 }
 function resign(){
   if(mode!="on"||over||!paired||me=="s")return;
