@@ -168,6 +168,15 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 #pick b{font-size:16px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #pick{background:#2c2642!important;border-color:#5d5180;box-shadow:0 0 0 100vmax #0009,0 12px 40px #000a!important}}
 :root[data-theme="dark"] #pick{background:#2c2642!important;border-color:#5d5180;box-shadow:0 0 0 100vmax #0009,0 12px 40px #000a!important}
+.tmr{width:min(94vw,520px);box-sizing:border-box;text-align:center;font-weight:700;font-size:15px;padding:6px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-variant-numeric:tabular-nums;min-height:20px}
+.tmr:empty{display:none}
+.tmr.low{color:#e2486b;border-color:#ff9aae;animation:tpulse 1s ease-in-out infinite}
+.tmr.ps{color:#7a6aa8;border-color:var(--lav)}
+@keyframes tpulse{50%{background:#ffe3ea}}
+#board{position:relative}
+#board.paused::after{content:"⏸ 일시정지";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:min(7vw,32px);font-weight:800;color:#5b4870;background:#ffffffb8;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:10}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root:not([data-theme="light"]) .tmr.low{color:#ff8fa3}}
+:root[data-theme="dark"] #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root[data-theme="dark"] .tmr.low{color:#ff8fa3}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -190,10 +199,11 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 <div id="game" hidden>
 <h1>♟ 퓨스 <span class="en">phewss</span></h1>
 <div class="bar"><div class="p" id="pw"></div><div class="p" id="pb"></div></div>
+<div id="tmr" class="tmr"></div>
 <div class="card" id="who"></div>
 <div id="board"></div>
 <div id="msg"></div>
-<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="specb" hidden onclick="toSpectate()" style="background:var(--lav);color:#4a3f66">👀 관전으로</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
+<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="pauseb" onclick="togglePause()" style="background:var(--lav);color:#4a3f66">⏸</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="specb" hidden onclick="toSpectate()" style="background:var(--lav);color:#4a3f66">👀 관전으로</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
 <div class="rules closed" id="rules">
 <div class="rhead" onclick="toggleRules()"><b>📖 규칙</b><span id="rarr">▼</span></div>
 <div id="rbody">
@@ -212,6 +222,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 • 온라인: 🔄 새 게임은 게임이 끝났으면 바로, 진행 중이면 상대가 수락해야 시작돼요<br>
 • 온라인: 게임 시작 전엔 👀 관전으로 바꿀 수 있지만, 한 번 고른 팀은 바꿀 수 없어요<br>
 • 온라인: 나가도 같은 기기·브라우저로 다시 들어오면 원래 팀으로 이어서 해요 (기권은 🏳️ 버튼)<br>
+• ⏱ 한 턴은 3분! 시간이 지나면 턴이 상대에게 넘어가요 · ⏸ 일시정지 가능<br>
 • 상대 왕을 죽이거나 점수 15점을 먼저 모으면 승리 (체크 없음)
 </div></div>
 </div>
@@ -221,6 +232,9 @@ const PS=t=>SV[t]?`<svg viewBox="0 0 45 45">${SV[t]}</svg>`:t;
 const NM={k:"킹",q:"퀸",r:"룩",b:"비숍",n:"나이트",p:"폰"};
 const G={k:"♚\uFE0E",q:"♛\uFE0E",r:"♜\uFE0E",b:"♝\uFE0E",n:"♞\uFE0E",p:"♟\uFE0E"},MAXHP=5,WIN=15;
 let B,I,turn,S,sel,over;
+const TURN_MS=180000;let tEnd=0,paused=false,tLeft=0,started=true;
+const now=()=>Date.now()+(window.__off||0);
+const fmtT=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+":"+String(ms%60).padStart(2,"0")};
 let fx=[],fxSeq=0,fxShown=0,snd=[],sndShown=0,hl=[],sp=[],ar=[],ef=[];
 const EFH={stun:'<span class="ef stun"><i>💫</i></span>',sword:'<span class="ef sword"><i></i><b>🗡️</b></span>',shield:'<span class="ef shield"><i></i></span>',merc:'<span class="ef merc"><i></i><b>✨</b></span>',extra:'<span class="ef extra"><i></i><b>⏩</b></span>'};
 function heal(y,x,n){if(n>0){hl.push([y,x,n]);snd.push("heal")}}
@@ -246,6 +260,9 @@ function sfx(n){if(muted)return;try{
   else if(n=="merc"){noise(.15,.12,3000);tone(392,.12,"triangle",.1,null,.05);tone(523,.12,"triangle",.1,null,.13);tone(784,.28,"triangle",.1,null,.21)}
   else if(n=="extra"){tone(660,.07,"square",.06);tone(990,.07,"square",.06,null,.08);tone(1320,.16,"square",.06,null,.16)}
   else if(n=="curse"){tone(523,.18,"sine",.09,null,0);tone(415,.18,"sine",.09,null,.12);tone(330,.4,"triangle",.09,200,.24);noise(.3,.08,500)}
+  else if(n=="timeout"){tone(880,.15,"square",.07);tone(660,.15,"square",.07,null,.17);tone(440,.35,"square",.07,null,.34)}
+  else if(n=="pause"){tone(660,.12,"sine",.09);tone(520,.18,"sine",.09,null,.1)}
+  else if(n=="resume"){tone(520,.12,"sine",.09);tone(780,.18,"sine",.09,null,.1)}
   else if(n=="win")[523,659,784,1047].forEach((f,i)=>tone(f,.25,"triangle",.15,null,i*.12));
 }catch(e){}}
 function toggleMute(b){muted=!muted;try{localStorage.setItem("mute",muted?"1":"0")}catch(e){}b.textContent=muted?"🔇":"🔊"}
@@ -264,7 +281,7 @@ function init(){
     B[6][c]={t:"p",c:"w",hp:3};B[7][c]={t,c:"w",hp:t=="k"?6:3};
   });
   bags={t:[],b:[]};for(let i=0;i<6;i++)spawn();
-  turn="w";S={w:0,b:0};sel=null;over=false;winner=null;
+  turn="w";S={w:0,b:0};paused=false;tLeft=0;started=(typeof mode=="undefined"||mode!="on");tEnd=now()+TURN_MS;sel=null;over=false;winner=null;
   msg("백 차례");draw();
 }
 const IW={h:30,s:34,t:5,a:14,v:6,e:6,z:4,x:4,g:6,m:6,n:6,f:6,c:6,y:3,l:4,r:6,o:5};
@@ -325,6 +342,7 @@ function moves(r,c){
   return out;
 }
 function click(r,c){
+  if(paused||!started)return;
   if(over||(mode=="on"&&(turn!=me||!paired)))return;
   const p=B[r][c];
   if(sel){
@@ -416,6 +434,7 @@ function act(fr,fc,m){
     }
   }
   if(!snd.length)snd.push("move");
+  tEnd=now()+TURN_MS;
   sel=null;
   msg(summ()+note+(turn=="w"?"백":"흑")+" 차례");
   draw();push();
@@ -472,8 +491,8 @@ function watchWins(){
 function show(g){$("lobby").hidden=!!g;$("game").hidden=!g;const lr=localStorage.getItem("lastRoom");$("rejoin").hidden=!lr||!uid;if(lr)$("rejoin").textContent="🔁 마지막 방 다시 들어가기 ("+lr+")"}
 function nick(){const n=$("nick").value.trim().slice(0,12);if(!n){alert("닉네임을 입력하세요");return null}localStorage.setItem("nick",n);return n}
 function startLocal(){mode="local";names={w:"백",b:"흑"};$("newb").hidden=false;$("resignb").hidden=true;show(1);init()}
-function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,snd,hl,sp,ar,ef,bags,fq:fxSeq});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
-function load(t){const o=JSON.parse(t);B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];snd=o.snd||[];hl=o.hl||[];sp=o.sp||[];ar=o.ar||[];ef=o.ef||[];if(o.bags)bags=o.bags;fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
+function push(){if(mode!="on")return;lastPushed=JSON.stringify({B,I,turn,S,over,w:winner,m:lastMsg,fx,snd,hl,sp,ar,ef,bags,fq:fxSeq,tEnd,paused,tLeft,started});fdb.ref("rooms/"+rid+"/state").set(lastPushed);if(over)fdb.ref("rooms/"+rid+"/status").set("done")}
+function load(t){const o=JSON.parse(t);tEnd=o.tEnd||now()+TURN_MS;paused=!!o.paused;tLeft=o.tLeft||0;started=o.started!==false;B=o.B;I=o.I;turn=o.turn;S=o.S;over=o.over;winner=o.w;fx=o.fx||[];snd=o.snd||[];hl=o.hl||[];sp=o.sp||[];ar=o.ar||[];ef=o.ef||[];if(o.bags)bags=o.bags;fxSeq=o.fq||0;sel=null;msg(o.m);draw();if(over)record()}
 function record(){
   if(mode!="on"||!winner||me=="s")return;
   const w=winner,m=me,d=w=="d"?5:w==m?30:-10;
@@ -510,6 +529,7 @@ function seatsUpdate(v){
     if(!over){if(me!="s")fdb.ref("rooms/"+rid+"/status").set("playing");msg("두 팀 모두 입장! "+(turn=="w"?"백":"흑")+" 차례")}
   }
   if(!paired&&!over)msg("상대 팀을 기다리는 중…");
+  if(paired&&!started&&!over&&me=="w"&&B){started=true;tEnd=now()+TURN_MS;push()}
   draw();renderWho();
 }
 function enter(id,role,n,fresh){
@@ -600,7 +620,7 @@ function newGame(){
 }
 function resetRoom(){
   reqPending=false;fdb.ref("rooms/"+rid+"/rec").remove();fdb.ref("rooms/"+rid+"/newreq").remove();
-  init();snd=["merc"];fxSeq++;draw();push();
+  init();if(paired){started=true;tEnd=now()+TURN_MS}snd=["merc"];fxSeq++;draw();push();
   if(paired)fdb.ref("rooms/"+rid+"/status").set("playing");
 }
 function resign(){
@@ -630,7 +650,7 @@ function gcRooms(){
   lastRooms.forEach(c=>{const r=c.val()||{};if(pCount(r)===0&&now-(r.ts||0)>EMPTY_MS&&c.key!==rid)c.ref.remove()});
 }
 function watchLobby(){
-  fdb.ref(".info/serverTimeOffset").on("value",x=>{srvOff=x.val()||0});
+  fdb.ref(".info/serverTimeOffset").on("value",x=>{srvOff=x.val()||0;window.__off=srvOff});
   setInterval(gcRooms,30000);
   fdb.ref("rooms").limitToLast(60).on("value",s=>{
     lastRooms=s;gcRooms();
@@ -654,4 +674,39 @@ try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.
 document.getElementById("theme").textContent=curTheme()=="dark"?"☀️":"🌙";
 function toggleRules(force){const r=document.getElementById("rules");const c=force!==undefined?force:!r.classList.contains("closed");r.classList.toggle("closed",c);try{localStorage.setItem("rulesClosed",c?"1":"0")}catch(e){}}
 try{if(localStorage.getItem("rulesClosed")=="0")document.getElementById("rules").classList.remove("closed")}catch(e){}
+function canAct(){return typeof mode=="undefined"||mode!="on"||(me!="s"&&paired)}
+function canTimeout(){
+  if(typeof mode=="undefined"||mode!="on")return true;
+  if(me=="s"||!paired)return false;
+  const other=turn=="w"?"b":"w";if(me==other)return true;
+  return !Object.values(pres).some(p=>p.role==other);
+}
+function togglePause(){
+  if(over||!started||!canAct())return;
+  if(paused){paused=false;tEnd=now()+tLeft;snd=["resume"];msg("▶ 다시 시작! "+(turn=="w"?"백":"흑")+" 차례")}
+  else{tLeft=Math.max(0,tEnd-now());paused=true;snd=["pause"];msg("⏸ 일시정지")}
+  fx=[];hl=[];sp=[];ar=[];ef=[];fxSeq++;sel=null;draw();if(typeof push=="function")push();
+}
+function timeoutTurn(){
+  fx=[];hl=[];sp=[];ar=[];ef=[];snd=["timeout"];fxSeq++;dealt=0;kd={w:0,b:0};
+  B.flat().forEach(x=>{if(x&&x.c==turn&&x.stun)x.stun--});
+  const was=turn;turn=turn=="w"?"b":"w";
+  B.flat().forEach(x=>{if(x&&x.c==turn&&x.inv)x.inv--});
+  if(I.flat().filter(Boolean).length<8)spawn();
+  tEnd=now()+TURN_MS;sel=null;
+  msg("⏰ "+(was=="w"?"백":"흑")+" 시간 초과! "+(turn=="w"?"백":"흑")+" 차례");draw();if(typeof push=="function")push();
+}
+function tick(){
+  const el=document.getElementById("tmr"),pb=document.getElementById("pauseb"),bd=document.getElementById("board");
+  if(!el||!B){return}
+  const live=started&&!over&&!(typeof mode!="undefined"&&mode=="on"&&!paired);
+  bd.classList.toggle("paused",paused&&!over);
+  if(pb){pb.hidden=!live||!canAct();pb.textContent=paused?"▶ 재개":"⏸ 일시정지"}
+  if(!live){el.textContent="";el.className="tmr";return}
+  const rem=paused?tLeft:tEnd-now(),nm=typeof names!="undefined"&&typeof mode!="undefined"&&mode=="on"?names[turn]:(turn=="w"?"백":"흑");
+  el.className="tmr"+(paused?" ps":rem<=30000?" low":"");
+  el.textContent=paused?"⏸ 일시정지 · "+(turn=="w"?"⚪ ":"⚫ ")+nm+" 남은 시간 "+fmtT(rem):"⏱ "+(turn=="w"?"⚪ ":"⚫ ")+nm+" · "+fmtT(rem);
+  if(!paused&&rem<=0&&canTimeout())timeoutTurn();
+}
+setInterval(tick,250);
 </script></body></html>
