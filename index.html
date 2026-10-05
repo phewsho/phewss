@@ -148,7 +148,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 #rbody{margin-top:6px}
 .rules.closed #rarr{transform:rotate(-90deg)}
 .rules.closed #rbody{display:none}
-#localb{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:62px;z-index:20;padding:5px 11px;font-size:12px;border-radius:14px;background:var(--card);color:var(--fg);border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
+#localb{padding:5px 11px;font-size:12px;border-radius:14px;background:var(--card);color:var(--fg);border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
 h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}}
 :root[data-theme="dark"] .pc.tn{filter:drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 1.4px #8fe6c6) drop-shadow(0 0 3px #8fe6c666)}
@@ -178,6 +178,8 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root:not([data-theme="light"]) .tmr.low{color:#ff8fa3}}
 :root[data-theme="dark"] #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root[data-theme="dark"] .tmr.low{color:#ff8fa3}
 #aisel{padding:8px 10px;border-radius:12px;font:inherit;font-weight:600;background:var(--card);color:var(--fg);border:1px solid var(--line)}
+#aib{padding:5px 11px;font-size:12px;border-radius:14px;background:linear-gradient(135deg,#ffe08a,#ffb3c7);color:#5b3a2a;border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
+.topbtns{display:flex;gap:6px;justify-content:flex-end;align-items:center;width:min(94vw,520px);min-height:40px;padding-right:50px;box-sizing:border-box}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -185,7 +187,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 </head><body>
 <button id="theme" onclick="toggleTheme()" title="다크/라이트 모드">🌙</button>
 <div id="lobby">
-<button id="localb" onclick="startLocal()">👥 로컬 2인</button>
+<div class="topbtns"><button id="aib" onclick="pickAI()">🤖 AI 대전</button><button id="localb" onclick="aiLevel=0;startLocal();setAI(0)">👥 로컬 2인</button></div>
 <h1>♟ 퓨스 <span class="en">phewss</span></h1>
 <div class="card"><b>닉네임</b><input id="nick" maxlength="12" placeholder="닉네임 (이 기기에 저장돼요)">
 <small id="fbmsg"></small></div>
@@ -229,6 +231,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 </div></div>
 </div>
 <script>
+var aiLevel=0,aiBusy=false,LVN=["","쉬움","보통","어려움"],aiRec={1:{w:0,l:0},2:{w:0,l:0},3:{w:0,l:0}};
 const SV={"p": "<path d=\"M18.5 22h8l-.8 2.5c2.6 2.6 4.3 6.5 4.8 11.5h-16c.5-5 2.2-8.9 4.8-11.5z\"/><circle cx=\"22.5\" cy=\"15.5\" r=\"5.2\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "r": "<path d=\"M14.5 36l1.3-13h13.4l1.3 13z\"/><path d=\"M12 23v-9h4.2v3.2h3.8V14h5v3.2h3.8V14H33v9z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "b": "<path d=\"M15.5 36c1-4.2 2.8-7.2 4.2-9h5.6c1.4 1.8 3.2 4.8 4.2 9z\"/><path d=\"M22.5 9c-5.2 4-7.4 9-6.4 13 .8 3 3.2 5 6.4 5s5.6-2 6.4-5c1-4-1.2-9-6.4-13z\"/><circle cx=\"22.5\" cy=\"7\" r=\"2.2\"/><path class=\"ln\" d=\"M25 14l-4.5 5.5\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "n": "<path d=\"M13.5 36c.3-5.5 2.6-9.6 6.4-12.4l-6 1.2c-2.1.3-3.4-1.7-2.4-3.6l5.6-7.6c1-1.6 2.6-2.8 4.2-3.6l.8-3.2 2.2 2.9c6.4 1.2 10.2 7.4 9.6 16.3L33.4 36z\"/><circle class=\"ey\" cx=\"19.5\" cy=\"15.5\" r=\"1.3\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "q": "<path d=\"M14 31L11 15l3.6 6.5L17 11l3 9 2.5-11 2.5 11 3-9 2.4 10.5L34 15l-3 16z\"/><circle cx=\"11\" cy=\"14\" r=\"1.9\"/><circle cx=\"17\" cy=\"10.2\" r=\"1.9\"/><circle cx=\"22.5\" cy=\"8\" r=\"1.9\"/><circle cx=\"28\" cy=\"10.2\" r=\"1.9\"/><circle cx=\"34\" cy=\"14\" r=\"1.9\"/><path d=\"M14 31h17l1.2 5H12.8z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>", "k": "<path d=\"M14 31c-3.4-4.4-4.2-9.5-1.2-12.4 3.2-3 7.5-.9 9.7 3.4 2.2-4.3 6.5-6.4 9.7-3.4 3 2.9 2.2 8-1.2 12.4z\"/><path class=\"ln\" d=\"M22.5 5v12M18.5 9h8\"/><path d=\"M14 31h17l1.2 5H12.8z\"/><path d=\"M11 40h23c0-2.2-1.2-4-3.2-4H14.2C12.2 36 11 37.8 11 40z\"/>"};
 const PS=t=>SV[t]?`<svg viewBox="0 0 45 45">${SV[t]}</svg>`:t;
 const NM={k:"킹",q:"퀸",r:"룩",b:"비숍",n:"나이트",p:"폰"};
@@ -398,7 +401,7 @@ function act(fr,fc,m){
         snd.push("stun");note="💫 경직! 주변 적 "+n+"기가 다음 턴에 움직이지 못해요 · ";
       }
       else if(k=="s"){S[me]+=it.v||1;sp.push([m.r,m.c,it.v||1]);snd.push("coin");note="⭐ +"+(it.v||1)+"점 · ";if(S[me]>=WIN){note=pre+note}if(S[me]>=WIN){end(me,"점수 "+WIN+"점 달성!");return}}
-      else if(k=="t"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.c==me){const b=q.hp;q.hp=Math.min(mxh(q),q.hp+1);heal(y,x,q.hp-b)}}note="💖 아군 전체 체력 +1! · "}
+      else if(k=="t"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.c==me){const b=q.hp;q.hp=Math.min(mxh(q),q.hp+1);heal(y,x,q.hp-b)}}note="💞 아군 전체 체력 +1! · "}
       else if(k=="o"){let n=0;for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&!q.inv){dealt+=Math.min(1,q.hp);q.hp-=1;n++;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",1])}}snd.push("curse");note="💔 모든 말 체력 -1! (우리 편 포함) · "}
       else if(k=="a"){p.atk=(p.atk||3)+1;ef.push([m.r,m.c,"sword"]);snd.push("sword");note="🗡️ 공격력 "+p.atk+"! · "}
       else if(k=="v"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.t=="k"&&q.c==me){q.inv=1;ef.push([y,x,"shield"])}}snd.push("shield");note="🛡️ 우리 왕이 상대 한 턴 동안 무적! · "}
@@ -442,7 +445,7 @@ function act(fr,fc,m){
   msg(summ()+note+(turn=="w"?"백":"흑")+" 차례");
   draw();push();
 }
-function end(c,why){why=why+(summ()?" ("+summ().replace(/ · $/,"")+")":"");snd.push("win");over=true;winner=c;sel=null;msg("🎉 "+names[c]+" 승리! "+why);draw();push();record()}
+function end(c,why){why=why+(summ()?" ("+summ().replace(/ · $/,"")+")":"")+aiRecord(c);snd.push("win");over=true;winner=c;sel=null;msg("🎉 "+names[c]+" 승리! "+why);draw();push();record()}
 function msg(t){lastMsg=t;document.getElementById("msg").textContent=t}
 function draw(){
   if(!B)return;
@@ -486,7 +489,7 @@ const tierOf=v=>TIERS.find(t=>(v||0)>=t[0]);
 const tier=v=>tierOf(v)[1];
 const badge=v=>{const t=tierOf(v);return `<span class="tbadge" style="background:${t[2]}">${t[1]}</span>`};
 let mode="local",me="w",winner=null,lastMsg="",lastPushed="",rid=null,uid=null,fdb=null,names={w:"백",b:"흑"},offs=[],paired=false,pr=null,pres={},seats={},seatRef=null,picked={},seatU={},winsOf={},winRefs={};
-function wtag(k){const u=seatU[k];return mode=="on"&&seats[k]&&u&&winsOf[u]!=null?` <span class="wn">🏆${winsOf[u]}승</span>`:""}
+function wtag(k){if(isLocalMode())return aiTag(k);const u=seatU[k];return mode=="on"&&seats[k]&&u&&winsOf[u]!=null?` <span class="wn">🏆${winsOf[u]}승</span>`:""}
 function watchWins(){
   ["w","b"].forEach(k=>{const u=seatU[k];if(!u||winRefs[u])return;winRefs[u]=1;
     const r=fdb.ref("players/"+u+"/win");r.on("value",x=>{winsOf[u]=x.val()||0;draw();renderWho()});offs.push(()=>r.off())});
@@ -664,7 +667,7 @@ function watchLobby(){
 function fbInit(){
   if(FB.apiKey.startsWith("YOUR")||FB.databaseURL.startsWith("YOUR")){$("fbmsg").textContent="⚠️ 파일 안의 FB 설정에 apiKey와 databaseURL을 넣으면 온라인 대전이 켜져요. 지금은 로컬 대전만 가능해요.";return}
   firebase.initializeApp(FB);fdb=firebase.database();
-  firebase.auth().signInAnonymously().then(c=>{uid=c.user.uid;$("online").hidden=false;watchLobby();show(0)}).catch(e=>{$("fbmsg").textContent="Firebase 연결 실패: "+e.message});
+  firebase.auth().signInAnonymously().then(c=>{uid=c.user.uid;fdb.ref("players/"+uid+"/ai").once("value").then(x=>{const v=x.val()||{};[1,2,3].forEach(l=>{if(v[l]){aiRec[l].w=Math.max(aiRec[l].w,v[l].w||0);aiRec[l].l=Math.max(aiRec[l].l,v[l].l||0)}});saveAiRec()});$("online").hidden=false;watchLobby();show(0)}).catch(e=>{$("fbmsg").textContent="Firebase 연결 실패: "+e.message});
 }
 $("nick").value=localStorage.getItem("nick")||"";
 if(typeof firebase=="undefined")$("fbmsg").textContent="Firebase 스크립트를 불러오지 못해 로컬 대전만 가능해요.";else fbInit();
@@ -716,9 +719,25 @@ setInterval(tick,250);
 
 // ===== AI opponent (plays black in local mode) =====
 const AI_SIDE="b",PV={p:1,n:3,b:3,r:5,q:9,k:100};
-let aiLevel=0,aiBusy=false;try{aiLevel=+localStorage.getItem("ai")||0}catch(e){}
+aiLevel=0;aiBusy=false;try{aiLevel=+localStorage.getItem("ai")||0}catch(e){}
 function isLocalMode(){return typeof mode=="undefined"||mode!="on"}
-function setAI(v){aiLevel=+v;try{localStorage.setItem("ai",aiLevel)}catch(e){}
+function pickAI(){
+  $("pick").innerHTML=`<b>🤖 AI 대전 · 난이도 선택</b><small>나는 ⚪ 백, AI는 ⚫ 흑이에요</small><div class="row"><button onclick="startAI(1)">😊 쉬움</button><button onclick="startAI(2)">🙂 보통</button><button onclick="startAI(3)">😈 어려움</button></div><button onclick="$('pick').hidden=true" style="background:var(--lav);color:#4a3f66">취소</button>`;
+  $("pick").hidden=false;
+}
+function startAI(lv){$("pick").hidden=true;startLocal();setAI(lv);document.getElementById("aisel").value=String(lv)}
+// AI match record: kept separately from player-vs-player wins (per difficulty)
+aiRec={1:{w:0,l:0},2:{w:0,l:0},3:{w:0,l:0}};
+try{const t=JSON.parse(localStorage.getItem("aiRec")||"null");if(t)aiRec=Object.assign(aiRec,t)}catch(e){}
+function saveAiRec(){try{localStorage.setItem("aiRec",JSON.stringify(aiRec))}catch(e){}}
+function aiRecord(c){
+  if(!aiLevel||!isLocalMode())return "";
+  const lv=aiLevel,r=aiRec[lv];if(c=="w")r.w++;else r.l++;saveAiRec();
+  if(typeof fdb!="undefined"&&fdb&&typeof uid!="undefined"&&uid)fdb.ref("players/"+uid+"/ai/"+lv).set(r);
+  return c=="w"?" 🏆 AI "+LVN[lv]+" 상대 "+r.w+"승째!":"";
+}
+function aiTag(k){return aiLevel&&isLocalMode()&&k=="w"?` <span class="wn">🏆${aiRec[aiLevel].w}승</span>`:""}
+function setAI(v){aiLevel=+v;if(isLocalMode()){names=aiLevel?{w:localStorage.getItem("nick")||"나",b:"🤖 AI "+LVN[aiLevel]}:{w:"백",b:"흑"};draw()}try{localStorage.setItem("ai",aiLevel)}catch(e){}
   msg(aiLevel?"🤖 AI("+["","쉬움","보통","어려움"][aiLevel]+")가 흑을 맡아요. "+(turn=="w"?"백":"흑")+" 차례":"👥 2인 대전 · "+(turn=="w"?"백":"흑")+" 차례")}
 function allMoves(c){const out=[];for(let r=0;r<8;r++)for(let x=0;x<8;x++){const p=B[r][x];if(p&&p.c==c&&!p.stun)moves(r,x).forEach(m=>out.push([r,x,m]))}return out}
 function areaVal(cells,me,dmg,all){let v=0;cells.forEach(([y,x])=>{if(!ins(y,x))return;const q=B[y][x];if(!q||q.inv)return;if(!all&&q.c==me)return;
