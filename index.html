@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>아이템 체스</title>
+<title>퓨스 · phewss</title>
 <style>
 :root{--bg:#fdf5fa;--bg2:#eef7ff;--bg3:#effcf5;--fg:#4a4458;--l:#fffaf2;--d:#bfe5d8;--card:#ffffffd9;--acc:#8fd8b5;--acc2:#9fd3f2;--pink:#ffb3c7;--lav:#d9cdf3;--line:#ecdff3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1f1b2b;--bg2:#1a2133;--bg3:#18272a;--fg:#f1ecfb;--l:#aaa0d0;--d:#6c86ae;--card:#2a2540e6;--line:#3e3656}}
@@ -149,6 +149,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 .rules.closed #rarr{transform:rotate(-90deg)}
 .rules.closed #rbody{display:none}
 #localb{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:62px;z-index:20;padding:5px 11px;font-size:12px;border-radius:14px;background:var(--card);color:var(--fg);border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
+h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -157,7 +158,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 <button id="theme" onclick="toggleTheme()" title="다크/라이트 모드">🌙</button>
 <div id="lobby">
 <button id="localb" onclick="startLocal()">👥 로컬 2인</button>
-<h1>♟ 아이템 체스</h1>
+<h1>♟ 퓨스 <span class="en">phewss</span></h1>
 <div class="card"><b>닉네임</b><input id="nick" maxlength="12" placeholder="닉네임 (이 기기에 저장돼요)">
 <small id="fbmsg"></small></div>
 <div class="card" id="online" hidden><b>방 만들기</b><input id="rid" maxlength="20" placeholder="방 ID (영문·숫자, 비우면 자동)" autocapitalize="off" autocomplete="off" oninput="this.value=cleanId(this.value)"><input id="rpw" type="password" maxlength="20" placeholder="비밀번호 (선택, 비우면 공개방)" autocomplete="new-password">
@@ -169,7 +170,7 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 <div class="card" id="pick" hidden></div>
 </div>
 <div id="game" hidden>
-<h1>♟ 아이템 체스</h1>
+<h1>♟ 퓨스 <span class="en">phewss</span></h1>
 <div class="bar"><div class="p" id="pw"></div><div class="p" id="pb"></div></div>
 <div class="card" id="who"></div>
 <div id="board"></div>
