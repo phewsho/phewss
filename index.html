@@ -177,6 +177,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 #board.paused::after{content:"⏸ 일시정지";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:min(7vw,32px);font-weight:800;color:#5b4870;background:#ffffffb8;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:10}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root:not([data-theme="light"]) .tmr.low{color:#ff8fa3}}
 :root[data-theme="dark"] #board.paused::after{background:#1f1b2bc0;color:#e6dcff}:root[data-theme="dark"] .tmr.low{color:#ff8fa3}
+#aisel{padding:8px 10px;border-radius:12px;font:inherit;font-weight:600;background:var(--card);color:var(--fg);border:1px solid var(--line)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -203,7 +204,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 <div class="card" id="who"></div>
 <div id="board"></div>
 <div id="msg"></div>
-<div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="pauseb" onclick="togglePause()" style="background:var(--lav);color:#4a3f66">⏸</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="specb" hidden onclick="toSpectate()" style="background:var(--lav);color:#4a3f66">👀 관전으로</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
+<div class="row"><select id="aisel" onchange="setAI(this.value)" title="상대 선택"><option value="0">👥 2인</option><option value="1">🤖 AI 쉬움</option><option value="2">🤖 AI 보통</option><option value="3">🤖 AI 어려움</option></select><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="pauseb" onclick="togglePause()" style="background:var(--lav);color:#4a3f66">⏸</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="specb" hidden onclick="toSpectate()" style="background:var(--lav);color:#4a3f66">👀 관전으로</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
 <div class="rules closed" id="rules">
 <div class="rhead" onclick="toggleRules()"><b>📖 규칙</b><span id="rarr">▼</span></div>
 <div id="rbody">
@@ -213,7 +214,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 • ❤️ 하트 개수만큼 체력 회복 · 💞 아군 전체 체력 +1 · 💔 양쪽 모든 말 체력 -1 (우리 편 포함) · ⭐ 별 개수만큼 점수 (별이 많을수록 드물게 나와요) · 🎁 랜덤 아이템(뭐가 나올지 몰라요, 숨겨진 지뢰 포함)<br>
 • 🗡️ 공격력 +1 · 🛡️ 우리 왕 무적(상대 한 턴) · ⏩ 한 번 더 · 👤 용병(말 하나 공짜)<br>
 • 💫 경직: 주변 8칸 적 말이 다음 턴에 움직이지 못함<br>
-• 🔀 모양 변화: 먹은 말이 랜덤한 기물로 변신 (퀸은 드물게, 룩은 조금 드물게), 체력은 유지 (왕은 제외)<br>
+• 🔀 모양 변화: 먹은 말이 랜덤한 기물로 변신 (퀸은 아주 드물게, 룩은 조금 드물게), 체력은 유지 (왕은 제외)<br>
 • 🧹↔ 가로줄 · 🧹↕ 세로줄의 적 모두에게 피해 2<br>
 • ➕ 십자(가로+세로) · <span class="it" style="display:inline-flex;vertical-align:middle;font-size:16px" id="xrule"></span> 대각선 4방향의 적 모두에게 피해 2<br>
 • 💣 지뢰: 주변 8칸의 <b>적</b> 말만 피해 2 (보임)<br>
@@ -223,6 +224,7 @@ h1 .en{font-size:.6em;font-weight:600;letter-spacing:.04em;opacity:.85}
 • 온라인: 게임 시작 전엔 👀 관전으로 바꿀 수 있지만, 한 번 고른 팀은 바꿀 수 없어요<br>
 • 온라인: 나가도 같은 기기·브라우저로 다시 들어오면 원래 팀으로 이어서 해요 (기권은 🏳️ 버튼)<br>
 • ⏱ 한 턴은 3분! 시간이 지나면 턴이 상대에게 넘어가요 · ⏸ 일시정지 가능<br>
+• 🤖 로컬에서는 AI(쉬움·보통·어려움)와 대결할 수 있어요. AI는 흑이에요<br>
 • 상대 왕을 죽이거나 점수 10점을 먼저 모으면 승리 (체크 없음)
 </div></div>
 </div>
@@ -343,6 +345,7 @@ function moves(r,c){
 }
 function click(r,c){
   if(paused||!started)return;
+  if(aiLevel&&isLocalMode()&&turn==AI_SIDE)return;
   if(over||(mode=="on"&&(turn!=me||!paired)))return;
   const p=B[r][c];
   if(sel){
@@ -402,7 +405,7 @@ function act(fr,fc,m){
       else if(k=="c"){
         if(p.t=="k")note="🔀 왕은 모양이 바뀌지 않아요 · ";
         else{
-          const o="qrrbbbnnnppp".split("").filter(t=>t!=p.t&&!(t=="p"&&(m.r==0||m.r==7)));
+          const o="qrrrbbbbbnnnnnpppppp".split("").filter(t=>t!=p.t&&!(t=="p"&&(m.r==0||m.r==7)));
           p.t=o[R(0,o.length-1)];note="🔀 "+NM[p.t]+"(으)로 변신! · ";
         }
       }
@@ -701,6 +704,7 @@ function tick(){
   if(!el||!B){return}
   const live=started&&!over&&!(typeof mode!="undefined"&&mode=="on"&&!paired);
   bd.classList.toggle("paused",paused&&!over);
+  const as=document.getElementById("aisel");if(as)as.hidden=!isLocalMode();
   if(pb){pb.hidden=!live||!canAct();pb.textContent=paused?"▶ 재개":"⏸ 일시정지"}
   if(!live){el.textContent="";el.className="tmr";return}
   const rem=paused?tLeft:tEnd-now(),nm=typeof names!="undefined"&&typeof mode!="undefined"&&mode=="on"?names[turn]:(turn=="w"?"백":"흑");
@@ -709,4 +713,69 @@ function tick(){
   if(!paused&&rem<=0&&canTimeout())timeoutTurn();
 }
 setInterval(tick,250);
+
+// ===== AI opponent (plays black in local mode) =====
+const AI_SIDE="b",PV={p:1,n:3,b:3,r:5,q:9,k:100};
+let aiLevel=0,aiBusy=false;try{aiLevel=+localStorage.getItem("ai")||0}catch(e){}
+function isLocalMode(){return typeof mode=="undefined"||mode!="on"}
+function setAI(v){aiLevel=+v;try{localStorage.setItem("ai",aiLevel)}catch(e){}
+  msg(aiLevel?"🤖 AI("+["","쉬움","보통","어려움"][aiLevel]+")가 흑을 맡아요. "+(turn=="w"?"백":"흑")+" 차례":"👥 2인 대전 · "+(turn=="w"?"백":"흑")+" 차례")}
+function allMoves(c){const out=[];for(let r=0;r<8;r++)for(let x=0;x<8;x++){const p=B[r][x];if(p&&p.c==c&&!p.stun)moves(r,x).forEach(m=>out.push([r,x,m]))}return out}
+function areaVal(cells,me,dmg,all){let v=0;cells.forEach(([y,x])=>{if(!ins(y,x))return;const q=B[y][x];if(!q||q.inv)return;if(!all&&q.c==me)return;
+  const sg=q.c==me?-1:1,k=q.t=="k";v+=sg*(q.hp<=dmg?(k?100000:PV[q.t]*10):dmg*(k?12:PV[q.t]*1.2))});return v}
+function itemVal(it,p,r,c,me){
+  const k=it.k,v=it.v||1,line=[];
+  if(k=="s")return (S[me]+v>=WIN?100000:0)+v*12*(1+S[me]/WIN);
+  if(k=="h")return Math.max(0,Math.min(v,mxh(p)-p.hp))*(p.t=="k"?8:PV[p.t]*1.5);
+  if(k=="t"){let n=0;B.flat().forEach(q=>{if(q&&q.c==me&&q.hp<mxh(q))n+=q.t=="k"?6:PV[q.t]});return n*.8}
+  if(k=="z"){for(let x=0;x<8;x++)if(x!=c)line.push([r,x]);return areaVal(line,me,2)}
+  if(k=="l"){for(let y=0;y<8;y++)if(y!=r)line.push([y,c]);return areaVal(line,me,2)}
+  if(k=="y"){for(let i=0;i<8;i++){if(i!=c)line.push([r,i]);if(i!=r)line.push([i,c])}return areaVal(line,me,2)}
+  if(k=="x"){for(let d=1;d<8;d++)[[1,1],[-1,-1],[1,-1],[-1,1]].forEach(([a,b])=>line.push([r+a*d,c+b*d]));return areaVal(line,me,2)}
+  if(k=="m"){for(let y=r-1;y<=r+1;y++)for(let x=c-1;x<=c+1;x++)if(y!=r||x!=c)line.push([y,x]);return areaVal(line,me,2)}
+  if(k=="o"){for(let y=0;y<8;y++)for(let x=0;x<8;x++)if(y!=r||x!=c)line.push([y,x]);return areaVal(line,me,1,true)+(p.hp<=1?-PV[p.t]*10:0)}
+  if(k=="f"){let n=0;for(let y=r-1;y<=r+1;y++)for(let x=c-1;x<=c+1;x++){const q=ins(y,x)&&B[y][x];if(q&&q.c!=me)n+=2}return n}
+  if(k=="c")return p.t=="p"?4:p.t=="q"?-6:p.t=="k"?0:1;
+  return {a:5,v:4,e:8,g:6,r:5}[k]||0; // hidden mines ("n") are invisible, so the AI can't see them either
+}
+function moveGain(fr,fc,m,me){
+  const p=B[fr][fc];let s=0,lands=true;
+  if(m.atk){const t=B[m.r][m.c],d=p.atk||3;
+    if(t.inv){s-=1;lands=false}
+    else if(t.hp<=d)s+=t.t=="k"?100000:PV[t.t]*10;
+    else{lands=false;s+=d*(t.t=="k"?12:PV[t.t]*1.2)}}
+  if(lands){const it=I[m.r][m.c];if(it&&it.k!="n")s+=itemVal(it,p,m.r,m.c,me);if(p.t=="p"&&(m.r==0||m.r==7))s+=8}
+  return {s,lands};
+}
+function oppBest(fr,fc,m,lands,me,withItems){
+  const foe=me=="w"?"b":"w",save=B,saveI=I;B=B.map(row=>row.map(q=>q?{...q}:null));I=I.map(row=>row.slice());
+  const p=B[fr][fc];
+  if(lands){B[m.r][m.c]=p;B[fr][fc]=null;I[m.r][m.c]=null}else if(m.atk){const t=B[m.r][m.c];if(!t.inv)t.hp-=p.atk||3}
+  let best=0;
+  for(const [r,c,mm] of allMoves(foe)){
+    const g=moveGain(r,c,mm,foe);
+    const v=withItems?g.s:(mm.atk?g.s:0);
+    if(v>best)best=v;
+  }
+  B=save;I=saveI;return best;
+}
+function aiMove(side,lv){
+  side=side||AI_SIDE;lv=lv||aiLevel;
+  if(over||paused||turn!=side)return;
+  const all=allMoves(side);
+  if(!all.length){timeoutTurn();return}
+  let pick;
+  const scored=all.map(([r,c,m])=>{const g=moveGain(r,c,m,side);let sc=g.s;
+    if(lv>=2&&sc<100000)sc-=oppBest(r,c,m,g.lands,side,lv>=3)*(lv>=3?.95:.6);
+    return {r,c,m,sc:sc+Math.random()*(lv==3?.3:2)}});
+  if(lv==1&&Math.random()<.75)pick=scored[R(0,scored.length-1)];
+  else pick=scored.reduce((a,b)=>b.sc>a.sc?b:a);
+  act(pick.r,pick.c,pick.m);
+}
+setInterval(()=>{
+  if(!aiLevel||aiBusy||!isLocalMode()||!B||over||paused||!started||turn!=AI_SIDE)return;
+  if(document.getElementById("game")&&document.getElementById("game").hidden)return;
+  aiBusy=true;setTimeout(()=>{try{aiMove()}finally{aiBusy=false}},aiLevel==1?500:750);
+},200);
+document.getElementById("aisel").value=String(aiLevel);
 </script></body></html>
