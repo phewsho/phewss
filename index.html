@@ -143,6 +143,12 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 :root[data-theme="dark"] .dir b{background:#2a2540e6;color:#f1e9ff}
 :root[data-theme="dark"] .track{background:#3a3350}
 :root[data-theme="dark"] button#theme{background:var(--card);color:var(--fg)}
+.rhead{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+#rarr{display:inline-block;transition:transform .2s;font-size:12px;opacity:.7}
+#rbody{margin-top:6px}
+.rules.closed #rarr{transform:rotate(-90deg)}
+.rules.closed #rbody{display:none}
+#localb{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:62px;z-index:20;padding:5px 11px;font-size:12px;border-radius:14px;background:var(--card);color:var(--fg);border:1px solid var(--line);box-shadow:0 3px 10px #9b7fb833}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -150,9 +156,10 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 </head><body>
 <button id="theme" onclick="toggleTheme()" title="다크/라이트 모드">🌙</button>
 <div id="lobby">
+<button id="localb" onclick="startLocal()">👥 로컬 2인</button>
 <h1>♟ 아이템 체스</h1>
 <div class="card"><b>닉네임</b><input id="nick" maxlength="12" placeholder="닉네임 (이 기기에 저장돼요)">
-<button onclick="startLocal()">로컬 2인 대전</button><small id="fbmsg"></small></div>
+<small id="fbmsg"></small></div>
 <div class="card" id="online" hidden><b>방 만들기</b><input id="rname" maxlength="20" placeholder="방 이름"><input id="rid" maxlength="20" placeholder="방 ID (영문·숫자·한글, 비우면 자동)">
 <select id="side"><option value="w">⚪ 내가 백팀</option><option value="b">⚫ 내가 흑팀</option></select>
 <button onclick="create()">방 만들기</button>
@@ -168,24 +175,25 @@ input,select{background:#fff;border:1px solid var(--line);border-radius:12px;col
 <div id="board"></div>
 <div id="msg"></div>
 <div class="row"><button onclick="newGame()" id="newb">🔄 새 게임</button><button id="mute" onclick="toggleMute(this)" style="background:var(--lav);color:#4a3f66">🔊</button><button id="resignb" onclick="resign()" style="background:var(--lav);color:#4a3f66">🏳️ 기권</button><button onclick="leave()" style="background:var(--pink);color:#6b2a3a">나가기</button></div>
-<div class="rules">
-<b>규칙</b><br>
+<div class="rules closed" id="rules">
+<div class="rhead" onclick="toggleRules()"><b>📖 규칙</b><span id="rarr">▼</span></div>
+<div id="rbody">
 • 모든 말 체력 3 (왕은 6), 공격력 3 (상대 말 칸으로 이동 = 공격)<br>
 • 아이템은 빈칸 어디에나 나와요 (체력 최대 5)<br>
 • 아이템은 매 턴 랜덤 위치에 생기지만, 양쪽 진영에 개수와 종류가 고르게 나뉘어 나와요<br>
-• ❤️ 하트 개수만큼 체력 회복 · 💞 아군 전체 체력 +1 · ⭐ 별 개수만큼 점수 · 🎁 랜덤 아이템(뭐가 나올지 몰라요, 숨겨진 지뢰 포함)<br>
-• 🗡️ 공격력 +1 · 🛡️ 무적(상대 한 턴) · ⏩ 한 번 더 · 👤 용병(말 하나 공짜)<br>
+• ❤️ 하트 개수만큼 체력 회복 · 💞 아군 전체 체력 +1 · ⭐ 별 개수만큼 점수 (별이 많을수록 드물게 나와요) · 🎁 랜덤 아이템(뭐가 나올지 몰라요, 숨겨진 지뢰 포함)<br>
+• 🗡️ 공격력 +1 · 🛡️ 우리 왕 무적(상대 한 턴) · ⏩ 한 번 더 · 👤 용병(말 하나 공짜)<br>
 • 💫 경직: 주변 8칸 적 말이 다음 턴에 움직이지 못함<br>
-• 🔀 모양 변화: 먹은 말이 랜덤한 기물(퀸·룩·비숍·나이트·폰)로 변신, 체력은 유지 (왕은 제외)<br>
-• 🧹↔ 가로줄 · 🧹↕ 세로줄의 적 모두에게 피해 3<br>
-• ➕ 십자(가로+세로) · <span class="it" style="display:inline-flex;vertical-align:middle;font-size:16px" id="xrule"></span> 대각선 4방향의 적 모두에게 피해 3<br>
-• 💣 지뢰: 주변 8칸의 <b>적</b> 말만 피해 3 (보임)<br>
-• 숨겨진 지뢰: 밟으면 주변 8칸의 <b>모든</b> 말 피해 3 (안 보임, 조심!)<br>
+• 🔀 모양 변화: 먹은 말이 랜덤한 기물로 변신 (퀸은 드물게, 룩은 조금 드물게), 체력은 유지 (왕은 제외)<br>
+• 🧹↔ 가로줄 · 🧹↕ 세로줄의 적 모두에게 피해 2<br>
+• ➕ 십자(가로+세로) · <span class="it" style="display:inline-flex;vertical-align:middle;font-size:16px" id="xrule"></span> 대각선 4방향의 적 모두에게 피해 2<br>
+• 💣 지뢰: 주변 8칸의 <b>적</b> 말만 피해 2 (보임)<br>
+• 숨겨진 지뢰: 밟으면 주변 8칸의 <b>모든</b> 말 피해 2 (안 보임, 조심!)<br>
 • 공격 후 상대가 살아남으면 공격자는 제자리, 죽이면 그 칸으로 이동<br>
 • 온라인: 🔄 새 게임은 게임이 끝났으면 바로, 진행 중이면 상대가 수락해야 시작돼요<br>
 • 온라인: 나가도 같은 기기·브라우저로 다시 들어오면 원래 팀으로 이어서 해요 (기권은 🏳️ 버튼)<br>
 • 상대 왕을 죽이거나 점수 15점을 먼저 모으면 승리 (체크 없음)
-</div>
+</div></div>
 </div>
 <script>
 const G={k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"},MAXHP=5,WIN=15;
@@ -236,6 +244,8 @@ function init(){
 const IW={h:30,s:34,t:5,a:14,v:6,e:6,z:4,x:4,g:6,m:6,n:6,f:6,c:6,y:3,l:4,r:6};
 function roll(ex){const W={...IW};(ex||[]).forEach(k=>delete W[k]);let x=R(1,Object.values(W).reduce((a,b)=>a+b)),k;for(k in W){if((x-=W[k])<=0)break}return k}
 const rv=()=>[1,1,1,2,2,3][R(0,5)];
+const sv=()=>{const x=Math.random();return x<.6?1:x<.9?2:3};
+const vOf=k=>k=="s"?sv():rv();
 // fair random: each half (black side rows 0-3 / white side rows 4-7) draws from its own shuffled bag
 // with the same item mix, and new items go to whichever half currently has fewer items
 let bags={t:[],b:[]};
@@ -246,7 +256,7 @@ function spawn(){
   const a=cnt("t"),b=cnt("b");let h=a<b?"t":b<a?"b":(Math.random()<.5?"t":"b");
   let p=spot(h);if(!p){h=h=="t"?"b":"t";p=spot(h)}if(!p)return;
   if(!bags[h].length)bags[h]=makeBag();
-  I[p[0]][p[1]]={k:bags[h].pop(),v:rv()};
+  const nk=bags[h].pop();I[p[0]][p[1]]={k:nk,v:vOf(nk)};
 }
 const dir=(e,a)=>`<span class="dir">${e}<b>${a}</b></span>`;
 const XICON="<svg class=\"xa\" viewBox=\"0 0 24 24\"><path d=\"M7 7L17 17M17 7L7 17\"/><path class=\"tip\" d=\"M3 3L9.5 4.6L4.6 9.5ZM21 3L19.4 9.5L14.5 4.6ZM3 21L4.6 14.5L9.5 19.4ZM21 21L14.5 19.4L19.4 14.5Z\"/></svg>";
@@ -318,16 +328,16 @@ function act(fr,fc,m){
     if(it){
       I[m.r][m.c]=null;
       let k=it.k,pre="";const me=p.c,foe=me=="w"?"b":"w";
-      if(k=="r"){k=roll(["r"]);it.v=rv();pre="🎁 "+(icon({k,v:it.v}).replace(/<[^>]+>/g,"")||"❓")+" → "}
+      if(k=="r"){k=roll(["r"]);it.v=vOf(k);pre="🎁 "+(icon({k,v:it.v}).replace(/<[^>]+>/g,"")||"❓")+" → "}
       snd.push(["m","n","z","x","y","l"].includes(k)?"boom":"item");
       const add=n=>{const b=p.hp;p.hp=Math.min(mxh(p),p.hp+n);heal(m.r,m.c,p.hp-b)};
       const zone=(y,x,kd,d)=>{if(ins(y,x))ar.push([y,x,kd,d])};
-      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv){q.hp-=3;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",3])}};
+      const kill=(y,x)=>{const q=ins(y,x)&&B[y][x];if(q&&q.c==foe&&!q.inv){q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}};
       const blast=(all)=>{
         for(let y=m.r-1;y<=m.r+1;y++)for(let x=m.c-1;x<=m.c+1;x++){
           if(!ins(y,x)||(y==m.r&&x==m.c))continue;zone(y,x,"bm",1);
           const q=B[y][x];
-          if(q&&!q.inv&&(all||q.c==foe)){q.hp-=3;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",3])}
+          if(q&&!q.inv&&(all||q.c==foe)){q.hp-=2;if(q.hp<=0){die(y,x);B[y][x]=null}else ef.push([y,x,"hurt",2])}
         }
       };
       if(k=="h"){add(it.v);note="❤️ 체력 +"+it.v+" · "}
@@ -343,11 +353,11 @@ function act(fr,fc,m){
       else if(k=="s"){S[me]+=it.v||1;sp.push([m.r,m.c,it.v||1]);snd.push("coin");note="⭐ +"+(it.v||1)+"점 · ";if(S[me]>=WIN){note=pre+note}if(S[me]>=WIN){end(me,"점수 "+WIN+"점 달성!");return}}
       else if(k=="t"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.c==me){const b=q.hp;q.hp=Math.min(mxh(q),q.hp+1);heal(y,x,q.hp-b)}}note="💖 아군 전체 체력 +1! · "}
       else if(k=="a"){p.atk=(p.atk||3)+1;ef.push([m.r,m.c,"sword"]);snd.push("sword");note="🗡️ 공격력 "+p.atk+"! · "}
-      else if(k=="v"){p.inv=1;ef.push([m.r,m.c,"shield"]);snd.push("shield");note="🛡️ 무적! · "}
+      else if(k=="v"){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=B[y][x];if(q&&q.t=="k"&&q.c==me){q.inv=1;ef.push([y,x,"shield"])}}snd.push("shield");note="🛡️ 우리 왕이 상대 한 턴 동안 무적! · "}
       else if(k=="c"){
         if(p.t=="k")note="🔀 왕은 모양이 바뀌지 않아요 · ";
         else{
-          const o="qrbnp".split("").filter(t=>t!=p.t&&!(t=="p"&&(m.r==0||m.r==7)));
+          const o="qrrbbbnnnppp".split("").filter(t=>t!=p.t&&!(t=="p"&&(m.r==0||m.r==7)));
           p.t=o[R(0,o.length-1)];note="🔀 "+G[p.t]+" 으로 변신! · ";
         }
       }
@@ -357,8 +367,8 @@ function act(fr,fc,m){
       else if(k=="y"){for(let i=0;i<8;i++){zone(m.r,i,"sw",Math.abs(i-m.c));zone(i,m.c,"sw",Math.abs(i-m.r));kill(m.r,i);kill(i,m.c)}note="➕ 십자 공격! · "}
       else if(k=="x"){for(let d=1;d<8;d++){[[1,1],[-1,-1],[1,-1],[-1,1]].forEach(([a,b])=>zone(m.r+a*d,m.c+b*d,"xd",d));kill(m.r+d,m.c+d);kill(m.r-d,m.c-d);kill(m.r+d,m.c-d);kill(m.r-d,m.c+d)}note="❌ X자 공격! · "}
       else if(k=="g"){merc(me,m.r,m.c);snd.push("merc");note="👤 용병 합류! · "}
-      else if(k=="m"){blast(false);note="💣 지뢰! 주변 적 말 피해 3 · "}
-      else if(k=="n"){blast(true);note="💥 숨겨진 지뢰 폭발! 주변 모든 말 피해 3 · "}
+      else if(k=="m"){blast(false);note="💣 지뢰! 주변 적 말 피해 2 · "}
+      else if(k=="n"){blast(true);note="💥 숨겨진 지뢰 폭발! 주변 모든 말 피해 2 · "}
       note=pre+note;
       const ks=[...new Set(B.flat().filter(x=>x&&x.t=="k").map(x=>x.c))];
       if(ks.length<2){
@@ -582,4 +592,6 @@ function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.s
 function toggleTheme(){setTheme(curTheme()=="dark"?"light":"dark")}
 try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
 document.getElementById("theme").textContent=curTheme()=="dark"?"☀️":"🌙";
+function toggleRules(force){const r=document.getElementById("rules");const c=force!==undefined?force:!r.classList.contains("closed");r.classList.toggle("closed",c);try{localStorage.setItem("rulesClosed",c?"1":"0")}catch(e){}}
+try{if(localStorage.getItem("rulesClosed")=="0")document.getElementById("rules").classList.remove("closed")}catch(e){}
 </script></body></html>
