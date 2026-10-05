@@ -491,6 +491,7 @@ function renderWho(){
 function presence(n){
   pres={};pr=fdb.ref("rooms/"+rid+"/presence/"+uid);
   pr.set({nick:n,role:me});pr.onDisconnect().remove();
+  const tsr=fdb.ref("rooms/"+rid+"/ts");tsr.set(firebase.database.ServerValue.TIMESTAMP);tsr.onDisconnect().set(firebase.database.ServerValue.TIMESTAMP);
   const all=fdb.ref("rooms/"+rid+"/presence");
   all.on("value",s=>{pres=s.val()||{};renderWho()});
   offs.push(()=>all.off());
@@ -522,7 +523,7 @@ function enter(id,role,n,fresh){
 async function create(){
   const n=nick();if(!n)return;
   const id=cleanId($("rid").value)||Math.random().toString(36).slice(2,7).toUpperCase(),side=$("side").value,pw=$("rpw").value;
-  const room={host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid}};
+  const room={host:n,status:"waiting",seats:{[side]:n},su:{[side]:uid},ts:firebase.database.ServerValue.TIMESTAMP};
   if(pw)room.pw=await hpw(id,pw);
   fdb.ref("rooms/"+id).transaction(v=>v?undefined:room,(e,ok)=>{
     if(!ok){alert("이미 있는 방 ID예요. 다른 ID를 써 주세요");return}
@@ -593,7 +594,7 @@ function leave(){
   if(mode=="on"){
     const was=paired,mine=me,id=rid,other=seats[me=="w"?"b":"w"];
     offs.forEach(f=>f());offs=[];
-    if(pr){pr.remove();pr=null}
+    if(pr){pr.remove();pr=null;fdb.ref("rooms/"+id+"/ts").set(firebase.database.ServerValue.TIMESTAMP);fdb.ref("rooms/"+id+"/ts").onDisconnect().cancel()}
     if(seatRef){
       if(!was&&mine!="s"){seatRef.remove();if(!other)fdb.ref("rooms/"+id).remove()}
       else seatRef.onDisconnect().cancel();
@@ -602,9 +603,20 @@ function leave(){
   }
   $("pick").hidden=true;mode="local";show(0);
 }
+// empty-room cleanup: a room with nobody inside is hidden at once and deleted after EMPTY_MS
+// (the grace period lets someone who refreshed or briefly dropped come back to their seat)
+const EMPTY_MS=2*60*1000;let srvOff=0,lastRooms=null;
+const pCount=r=>r&&r.presence?Object.keys(r.presence).length:0;
+function gcRooms(){
+  if(!lastRooms)return;const now=Date.now()+srvOff;
+  lastRooms.forEach(c=>{const r=c.val()||{};if(pCount(r)===0&&now-(r.ts||0)>EMPTY_MS&&c.key!==rid)c.ref.remove()});
+}
 function watchLobby(){
-  fdb.ref("rooms").orderByChild("status").startAt("playing").limitToLast(30).on("value",s=>{
-    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats)return;h+=`<div class="row"><span>${r.pw?"🔒 ":""}<b>${esc(c.key)}</b> <small>· ${esc(r.host)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
+  fdb.ref(".info/serverTimeOffset").on("value",x=>{srvOff=x.val()||0});
+  setInterval(gcRooms,30000);
+  fdb.ref("rooms").limitToLast(60).on("value",s=>{
+    lastRooms=s;gcRooms();
+    let h="";s.forEach(c=>{const r=c.val(),w=r.status=="waiting";if(!r.seats||!pCount(r))return;h+=`<div class="row"><span>${r.pw?"🔒 ":""}<b>${esc(c.key)}</b> <small>· ${esc(r.host)} · 👥${pCount(r)}</small></span><button data-id="${esc(c.key)}" onclick="join(this.dataset.id)">${w?"입장":"관전·입장"}</button></div>`});
     $("rooms").innerHTML=h||"<small>열린 방이 없어요</small>";
   });
 }
